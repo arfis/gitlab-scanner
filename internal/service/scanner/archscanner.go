@@ -65,25 +65,32 @@ func (s *ArchScanner) ScanGraph() (*graph.Graph, error) {
 			continue
 		}
 
-		mod, serviceID := parseModuleID(goMod)
-		if serviceID == "" {
-			serviceID = p.Name // fallback
-		}
-		addNode(serviceID, graph.NodeService, map[string]string{
+		// service
+		mod, serviceShort := parseModuleID(goMod) // "git.prosoftke.sk/nghis/services/drg", "drg"
+		svcID := "svc:" + serviceShort
+		addNode(svcID, graph.NodeService, map[string]string{
 			"module": mod,
 			"path":   p.Path,
+			"label":  serviceShort, // used by Mermaid writer
 		})
 
-		// --- Clients via go.mod (effective require with replace)
-		reqs, _ := parseRequiresEffective(goMod)
+		// --- Dependencies via go.mod (treat ALL requires as clients)
+		reqs, _ := parseRequiresEffective(goMod) // keep replace support
 		for mpath, ver := range reqs {
-			if !strings.Contains(mpath, "/openapi/clients/go/") {
-				continue
+			if !isClientModule(mpath) {
+				continue // skip normal libraries
 			}
-			label := deriveClientLabel(mpath) // e.g. "nghisclinicalclient/v2"
-			addNode(label, graph.NodeClient, map[string]string{"module": mpath})
+
+			depID := "dep:" + mpath
+			addNode(depID, graph.NodeClient, map[string]string{
+				"module": mpath,
+				"label":  deriveClientLabel(mpath), // e.g. "nghisclinicalclient/v2"
+			})
 			addEdge(graph.Edge{
-				From: serviceID, To: label, Rel: "calls", Version: ver,
+				From:     svcID, // svcID like "svc:drg"
+				To:       depID,
+				Rel:      "calls", // or "depends"
+				Version:  ver,
 				Evidence: []graph.Evidence{{Hint: "require go.mod"}},
 			})
 		}
@@ -199,4 +206,15 @@ func findKafkaConsumerTopics(src []byte) (out []match) {
 		}
 	}
 	return
+}
+
+// put this near your scanner struct or as a package var
+var clientRe = regexp.MustCompile(`^git\.prosoftke\.sk/nghis/openapi/clients/go/[^/]+(?:/v\d+)?$`)
+
+// helper
+func isClientModule(path string) bool {
+	// strict org-specific match:
+	return clientRe.MatchString(path)
+	// If you want looser match, comment line above and use:
+	// return strings.Contains(path, "/openapi/clients/go/")
 }

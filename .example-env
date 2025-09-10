@@ -1,0 +1,5 @@
+GITLAB_TOKEN="your_token_here"
+GROUP="your_group_name"
+TAG="v1.0.0"
+MODULE="github.com/example/dependency"
+MIN_VERSION="v1.2.3"

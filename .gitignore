@@ -1,5 +1,5 @@
 .idea
 .env
-arch.json
-arch.mmd
+*arch.json
+*.mmd
 gitlab-list.iml

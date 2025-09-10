@@ -40,7 +40,7 @@ func (s *ClientScanner) Scan() {
 			continue
 		}
 
-		goMod := internal.GetGoMod(*s.cfg, project.ID, project.Name) // []byte
+		goMod := internal.GetGoMod(*s.cfg, project.ID, project.Name)
 		if len(goMod) == 0 {
 			continue
 		}
@@ -55,7 +55,7 @@ func (s *ClientScanner) Scan() {
 			if !s.matchesAnyPrefix(modPath) {
 				continue
 			}
-			label := deriveClientLabel(modPath) // e.g. "nghisclinicalclient/v2"
+			label := deriveClientLabel(modPath)
 			if s.printFullPath {
 				fmt.Printf("%s : %s -> %s (module: %s)\n", project.Name, label, modVersion, modPath)
 			} else {
@@ -65,6 +65,7 @@ func (s *ClientScanner) Scan() {
 	}
 }
 
+// todo: for now it is locked to this openapi/clients/go
 func (s *ClientScanner) matchesAnyPrefix(modulePath string) bool {
 	if len(s.prefixes) == 0 {
 		// Sensible default: anything under openapi/clients/go is a "client".

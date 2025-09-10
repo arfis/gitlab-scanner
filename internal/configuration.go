@@ -5,7 +5,7 @@ import (
 )
 
 type Configuration struct {
-	Token string `env:"GITLAB_TOKEN" env-default:"n5sYnGbw__3dZT4sHDXB"`
+	Token string `env:"GITLAB_TOKEN"`
 	Group string `env:"GROUP" env-default:"nghis"`
 	Tag   string `env:"TAG" env-default:"services"`
 }
