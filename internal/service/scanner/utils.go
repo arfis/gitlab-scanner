@@ -35,7 +35,6 @@ func GetProjects(cfg configuration.Configuration) []Project {
 		escaped := url.PathEscape(groupPath) // results in "nghis%2Fservices"
 
 		url := fmt.Sprintf("%s/groups/%s/projects?include_subgroups=true&per_page=100&page=%d", gitlabAPI, escaped, page)
-		fmt.Println(cfg)
 		resp, err := GitlabRequest(cfg.Token, url)
 		defer resp.Body.Close()
 

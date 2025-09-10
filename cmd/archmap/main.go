@@ -33,7 +33,6 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println(cfg.Token)
 	// ----- build full graph -----
 	arch, err := scanner.NewArchScanner(cfg).
 		SetRef(ref).

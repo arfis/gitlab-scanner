@@ -1,3 +1,5 @@
+## scanning which projects under which version are using the selected client - not parametrized yet (organizationgo hardcoded)
+go run cmd/scanner/main.go 
 
 # Commands to prepare architecture
 ## full graph (no module):
