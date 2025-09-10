@@ -1,9 +1,8 @@
-// cmd/archmap/main.go
-package main
+// internal/service/archmap/app.go
+package archmap
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"gitlab-list/internal/configuration"
 	"gitlab-list/internal/service/graph"
@@ -14,50 +13,46 @@ import (
 	"strings"
 )
 
-func main() {
-	// ----- flags / env -----
-	var (
-		ref     string
-		mod     string
-		radius  int
-		ignores string
-	)
-	flag.StringVar(&ref, "ref", getenv("REF", ""), "Git ref (branch/commit) to scan (default: repo default branch)")
-	flag.StringVar(&mod, "module", getenv("MODULE", ""), "Module/service to focus on (e.g., drg or full module path)")
-	flag.IntVar(&radius, "radius", getenvInt("RADIUS", 1), "Neighborhood radius from the selected node (ignored if no module)")
-	flag.StringVar(&ignores, "ignore", getenv("IGNORE", "archived,sandbox"), "Comma-separated substrings to ignore in project path")
-	flag.Parse()
+// App represents the archmap application
+type App struct {
+	config *configuration.Configuration
+}
 
+// NewApp creates a new archmap application instance
+func NewApp() (*App, error) {
 	cfg, err := configuration.NewConfiguration()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
+	return &App{config: cfg}, nil
+}
 
-	fmt.Println(cfg.Token)
+// Run executes the archmap application with the given parameters
+func (a *App) Run(ref, module string, radius int, ignores []string) error {
 	// ----- build full graph -----
-	arch, err := scanner.NewArchScanner(cfg).
+	arch, err := scanner.NewArchScanner(a.config).
 		SetRef(ref).
-		SetIgnore(splitCSV(ignores)...).
+		SetIgnore(ignores...).
 		ScanGraph()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	// ----- focus or full -----
 	var fg *graph.Graph
 	var base string
-	if strings.TrimSpace(mod) == "" {
+	if strings.TrimSpace(module) == "" {
 		// no module -> dump full graph
 		fg = arch
 		base = "full"
 	} else {
 		// module set -> focus view
-		targetID := resolveTargetNodeID(arch, mod)
+		targetID := resolveTargetNodeID(arch, module)
 		if targetID == "" {
-			panic(fmt.Sprintf("could not find node for module %q", mod))
+			return fmt.Errorf("could not find node for module %q", module)
 		}
 		fg = filterGraphByRadius(arch, targetID, radius)
-		base = sanitizeFileBase(mod)
+		base = sanitizeFileBase(module)
 	}
 
 	// ----- write JSON -----
@@ -66,7 +61,7 @@ func main() {
 		_ = json.NewEncoder(f).Encode(fg)
 		_ = f.Close()
 	} else {
-		panic(err)
+		return err
 	}
 
 	// ----- write Mermaid (safe IDs) -----
@@ -75,10 +70,11 @@ func main() {
 		writeMermaid(f, fg)
 		_ = f.Close()
 	} else {
-		panic(err)
+		return err
 	}
 
-	fmt.Printf("Wrote %s and %s (module=%q, radius=%d)\n", jsonPath, mmdPath, mod, radius)
+	fmt.Printf("Wrote %s and %s (module=%q, radius=%d)\n", jsonPath, mmdPath, module, radius)
+	return nil
 }
 
 // ---------- selection / filtering ----------
@@ -291,35 +287,4 @@ func sanitizeFileBase(s string) string {
 		return "arch"
 	}
 	return s
-}
-
-func splitCSV(s string) []string {
-	if strings.TrimSpace(s) == "" {
-		return nil
-	}
-	parts := strings.Split(s, ",")
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if p != "" {
-			out = append(out, p)
-		}
-	}
-	return out
-}
-
-func getenv(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
-}
-func getenvInt(key string, def int) int {
-	if v := os.Getenv(key); v != "" {
-		var x int
-		if _, err := fmt.Sscanf(v, "%d", &x); err == nil {
-			return x
-		}
-	}
-	return def
 }

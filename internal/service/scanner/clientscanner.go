@@ -2,18 +2,18 @@ package scanner
 
 import (
 	"fmt"
-	"gitlab-list/internal"
+	"gitlab-list/internal/configuration"
 	"strings"
 )
 
 type ClientScanner struct {
-	cfg           *internal.Configuration
+	cfg           *configuration.Configuration
 	prefixes      []string // module path prefixes that mark "clients"
 	ignores       []string // substrings to ignore in project path
 	printFullPath bool
 }
 
-func NewClientScanner(cfg *internal.Configuration) *ClientScanner {
+func NewClientScanner(cfg *configuration.Configuration) *ClientScanner {
 	return &ClientScanner{cfg: cfg}
 }
 
@@ -33,14 +33,14 @@ func (s *ClientScanner) SetPrintFullPath(v bool) *ClientScanner {
 }
 
 func (s *ClientScanner) Scan() {
-	projects := internal.GetProjects(*s.cfg)
+	projects := GetProjects(*s.cfg)
 
 	for _, project := range projects {
 		if shouldIgnore(project.Path, s.ignores) {
 			continue
 		}
 
-		goMod := internal.GetGoMod(*s.cfg, project.ID, project.Name)
+		goMod := GetGoMod(*s.cfg, project.ID, project.Name)
 		if len(goMod) == 0 {
 			continue
 		}

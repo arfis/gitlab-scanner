@@ -2,8 +2,9 @@ package scanner
 
 import (
 	"fmt"
-	"gitlab-list/internal"
 	"log"
+
+	"gitlab-list/internal/configuration"
 
 	"golang.org/x/mod/semver"
 )
@@ -14,11 +15,11 @@ type Scanner interface {
 
 type GoScanner struct {
 	minimalVersion string
-	cfg            *internal.Configuration
+	cfg            *configuration.Configuration
 	ignores        []string
 }
 
-func NewGoScanner(cfg *internal.Configuration) *GoScanner {
+func NewGoScanner(cfg *configuration.Configuration) *GoScanner {
 	return &GoScanner{cfg: cfg}
 }
 
@@ -36,14 +37,14 @@ func (s *GoScanner) Scan() {
 	if s.minimalVersion == "" {
 		return
 	}
-	projects := internal.GetProjects(*s.cfg)
+	projects := GetProjects(*s.cfg)
 
 	for _, project := range projects {
 		if shouldIgnore(project.Path, s.ignores) {
 			continue
 		}
 
-		goMod := internal.GetGoMod(*s.cfg, project.ID, project.Name) // []byte
+		goMod := GetGoMod(*s.cfg, project.ID, project.Name) // []byte
 		if len(goMod) == 0 {
 			continue
 		}

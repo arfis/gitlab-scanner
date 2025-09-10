@@ -1,12 +1,12 @@
 package main
 
 import (
-	"gitlab-list/internal"
+	"gitlab-list/internal/configuration"
 	"gitlab-list/internal/service/scanner"
 )
 
 func main() {
-	cfg, err := internal.NewConfiguration()
+	cfg, err := configuration.NewConfiguration()
 	if err != nil {
 		panic(err)
 	}

@@ -8,19 +8,19 @@ import (
 	"regexp"
 	"strings"
 
-	"gitlab-list/internal"
+	"gitlab-list/internal/configuration"
 
 	"golang.org/x/mod/modfile"
 )
 
 type ArchScanner struct {
-	cfg     *internal.Configuration
+	cfg     *configuration.Configuration
 	ref     string
 	ignores []string
 	roots   []string // only scan these dir prefixes in repo; default: cmd,internal,pkg
 }
 
-func NewArchScanner(cfg *internal.Configuration) *ArchScanner {
+func NewArchScanner(cfg *configuration.Configuration) *ArchScanner {
 	return &ArchScanner{cfg: cfg, roots: []string{"cmd", "internal", "pkg"}}
 }
 
@@ -41,7 +41,7 @@ func (s *ArchScanner) SetRoots(roots ...string) *ArchScanner {
 
 func (s *ArchScanner) ScanGraph() (*graph.Graph, error) {
 	g := &graph.Graph{Nodes: []graph.Node{}, Edges: []graph.Edge{}}
-	projects := internal.GetProjects(*s.cfg)
+	projects := GetProjects(*s.cfg)
 
 	// Handy indexers
 	nodeIdx := map[string]bool{}
@@ -60,7 +60,7 @@ func (s *ArchScanner) ScanGraph() (*graph.Graph, error) {
 		if shouldIgnore(p.Path, s.ignores) {
 			continue
 		}
-		goMod := internal.GetGoMod(*s.cfg, p.ID, p.Name, s.ref)
+		goMod := GetGoMod(*s.cfg, p.ID, p.Name, s.ref)
 		if len(goMod) == 0 {
 			continue
 		}
