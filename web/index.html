@@ -1,0 +1,1926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitLab Architecture Viewer</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            overflow-x: auto;
+            min-width: 100%;
+            /* Performance optimizations */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            will-change: scroll-position;
+        }
+        .container {
+            max-width: none;
+            width: 100%;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow-x: auto;
+            /* Performance optimizations */
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+            contain: layout style paint;
+        }
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .controls {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            background: #f8f9fa;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .form-row {
+            display: flex;
+            gap: 15px;
+        }
+        .form-row .form-group {
+            flex: 1;
+        }
+        
+        .library-filters {
+            flex: 2;
+            min-width: 400px;
+        }
+        
+        .library-inputs {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .library-inputs input,
+        .library-inputs select {
+            flex: 1;
+            min-width: 120px;
+        }
+        
+        /* Autocomplete styles */
+        .autocomplete-container {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+        
+        .autocomplete-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-top: none;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .autocomplete-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .autocomplete-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+        
+        .autocomplete-highlight {
+            background-color: #fff3cd;
+            font-weight: bold;
+        }
+        
+        .architecture-results {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            height: calc(100vh - 200px);
+            min-height: 600px;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            min-width: 100%;
+            overflow-x: auto;
+            /* Performance optimizations */
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+            contain: layout style paint;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .architecture-results h4 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #495057;
+            flex-shrink: 0;
+        }
+        
+        #architecture-content {
+            flex: 1;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            overflow: visible;
+            min-height: 400px;
+            width: 100%;
+            min-width: 100%;
+        }
+        
+        #architecture-content .mermaid {
+            text-align: center;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            min-width: fit-content;
+            /* Performance optimizations */
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+            contain: layout style paint;
+            will-change: transform;
+        }
+        
+        #architecture-content .mermaid svg {
+            max-height: 100%;
+            height: auto;
+            width: auto;
+            min-width: 600px;
+            /* Performance optimizations */
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+            contain: layout style paint;
+            will-change: transform;
+        }
+        
+        /* Mermaid diagram styling with performance optimizations */
+        .mermaid .node rect,
+        .mermaid .node circle,
+        .mermaid .node ellipse,
+        .mermaid .node polygon {
+            fill: #3498db;
+            stroke: #2980b9;
+            stroke-width: 2px;
+            /* Performance optimizations */
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+            will-change: transform;
+        }
+        
+        .mermaid .node .label {
+            color: #2c3e50;
+            font-weight: bold;
+            /* Performance optimizations */
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+        }
+        
+        .mermaid .edgePath .path {
+            stroke: #34495e;
+            stroke-width: 2px;
+            /* Performance optimizations */
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+        }
+        
+        .mermaid .edgeLabel {
+            background-color: #ecf0f1;
+            color: #2c3e50;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        button:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+        .content {
+            padding: 20px;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+        .error {
+            background: #e74c3c;
+            color: white;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .architecture-container {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            min-height: 400px;
+            background: white;
+        }
+        .file-list {
+            margin-top: 20px;
+        }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+        }
+        .file-info {
+            flex: 1;
+        }
+        .file-name {
+            font-weight: 500;
+            color: #2c3e50;
+        }
+        .file-meta {
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+        .file-actions button {
+            background: #27ae60;
+            font-size: 12px;
+            padding: 5px 10px;
+        }
+        .file-actions button:hover {
+            background: #229954;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        
+        .section h3 {
+            margin: 0 0 15px 0;
+            color: #2c3e50;
+            font-size: 18px;
+        }
+        
+        .project-results {
+            margin-top: 20px;
+        }
+        
+        .project-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .project-info {
+            flex: 1;
+        }
+        
+        .project-name {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+        
+        .project-path {
+            color: #7f8c8d;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        
+        .project-url {
+            margin-bottom: 10px;
+        }
+        
+        .project-url a {
+            color: #3498db;
+            text-decoration: none;
+            font-size: 14px;
+            word-break: break-all;
+        }
+        
+        .project-url a:hover {
+            text-decoration: underline;
+        }
+        
+        .project-details {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .detail-label {
+            font-size: 12px;
+            color: #7f8c8d;
+            font-weight: 500;
+        }
+        
+        .detail-value {
+            font-size: 14px;
+            color: #2c3e50;
+        }
+        
+        .libraries-list {
+            max-height: 100px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 5px;
+        }
+        
+        .library-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 2px 0;
+            font-size: 12px;
+        }
+        
+        .library-name {
+            color: #2c3e50;
+        }
+        
+        .library-version {
+            color: #7f8c8d;
+        }
+        
+        .search-stats {
+            background: #e8f4fd;
+            border: 1px solid #bee5eb;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            color: #0c5460;
+        }
+        
+        .config-status {
+            font-weight: 500;
+        }
+        
+        .config-status.success {
+            color: #27ae60;
+        }
+        
+        .config-status.error {
+            color: #e74c3c;
+        }
+        
+        .config-status.warning {
+            color: #f39c12;
+        }
+        
+        input[type="password"] {
+            font-family: monospace;
+        }
+        
+        small {
+            display: block;
+            margin-top: 5px;
+        }
+        
+        #loading-overlay {
+            display: flex;
+        }
+        
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        .loading-overlay-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        .cache-stats {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #6c757d;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .cache-status {
+            font-weight: 500;
+        }
+        
+        .cache-status.success {
+            color: #27ae60;
+        }
+        
+        .cache-status.error {
+            color: #e74c3c;
+        }
+        
+        .cache-info {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-left: 4px solid #007bff;
+            border-radius: 4px;
+        }
+        
+        .cache-info small {
+            color: #6c757d;
+            line-height: 1.4;
+        }
+        
+        .cache-status.warning {
+            color: #f39c12;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>GitLab Architecture Viewer</h1>
+            <p>Visualize your project dependencies and architecture</p>
+        </div>
+        
+        <div class="controls">
+            <!-- Configuration Section -->
+            <div class="section">
+                <h3>⚙️ Configuration</h3>
+                <div class="form-row">
+                    <div class="form-group" style="flex: 2;">
+                        <label for="gitlab-token">GitLab API Token:</label>
+                        <input type="password" id="gitlab-token" placeholder="Enter your GitLab API token">
+                        <small style="color: #7f8c8d; font-size: 12px;">Required for accessing GitLab projects</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="gitlab-group">Group:</label>
+                        <input type="text" id="gitlab-group" placeholder="nghis" value="nghis">
+                    </div>
+                    <div class="form-group">
+                        <label for="gitlab-tag">Tag:</label>
+                        <input type="text" id="gitlab-tag" placeholder="services" value="services">
+                    </div>
+                </div>
+                <button onclick="saveConfiguration()">Save Configuration</button>
+                <button onclick="testConnection()">Test Connection</button>
+                <span id="config-status" style="margin-left: 10px; font-size: 14px;"></span>
+            </div>
+
+            <!-- Cache Management Section -->
+            <div class="section">
+                <h3>💾 Cache Management</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="search-mode">Search Mode:</label>
+                    <select id="search-mode">
+                        <option value="cache">Use Cache (Fast)</option>
+                        <option value="live">Live Search (Fresh Data)</option>
+                        <option value="cache-first">Cache First, then Live</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <button onclick="loadInitialCache()">📥 Load Initial Cache</button>
+                    <button onclick="refreshCache()">🔄 Refresh Cache</button>
+                    <button onclick="clearCache()">🗑️ Clear Cache</button>
+                </div>
+            </div>
+           <div class="cache-info">
+               <small>💡 <strong>Load Initial Cache</strong> fetches all projects and analyzes their Go modules (go.mod files) to populate Go versions and library dependencies. This enables fast filtering by Go version and libraries.<br>
+               🔄 <strong>Hash-Based Cache:</strong> Cache uses content hashes instead of TTL - data stays valid until manually cleared or projects change.</small>
+           </div>
+           <div class="form-row">
+               <div class="form-group">
+                   <label for="webhook-project-id">Test: Refresh Project Cache:</label>
+                   <input type="number" id="webhook-project-id" placeholder="Project ID (e.g., 123)">
+               </div>
+               <div class="form-group">
+                   <button onclick="refreshProjectCache()">🔄 Refresh Project</button>
+               </div>
+           </div>
+           <div class="cache-info">
+               <small>🔗 <strong>GitLab Webhook URL:</strong> <code>POST /api/webhook/gitlab</code><br>
+               <strong>For GitLab Integration:</strong> Add this URL to your GitLab project webhooks:<br>
+               <code>http://your-server:8080/api/webhook/gitlab?token=your_gitlab_token</code><br>
+               <strong>Or use X-Gitlab-Token header:</strong> <code>X-Gitlab-Token: your_gitlab_token</code></small>
+           </div>
+           <div class="form-row">
+               <div class="form-group">
+                   <button onclick="checkChangedProjects()">🔍 Check Changed Projects</button>
+               </div>
+           </div>
+           <div class="cache-info">
+               <small>🔍 <strong>Change Detection:</strong> Check which projects have changed since last cache build using content hash comparison. Only projects with actual changes are detected.</small>
+           </div>
+                <div id="cache-stats" class="cache-stats" style="display: none;">
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-label">Total Cached:</span>
+                            <span class="stat-value" id="total-cached">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Cache Type:</span>
+                            <span class="stat-value" id="cache-type">Hash-Based</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Search Hashes:</span>
+                            <span class="stat-value" id="search-hashes">0</span>
+                        </div>
+                    </div>
+                </div>
+                <span id="cache-status" style="margin-left: 10px; font-size: 14px;"></span>
+            </div>
+
+            <!-- Project Search Section -->
+            <div class="section">
+                <h3>🔍 Project Search</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="search-go-version">Go Version:</label>
+                        <div class="autocomplete-container">
+                            <input type="text" id="search-go-version" placeholder="e.g., 1.21, 1.20" autocomplete="off">
+                            <div id="go-version-dropdown" class="autocomplete-dropdown" style="display: none;"></div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="go-version-comparison">Go Version Comparison:</label>
+                        <select id="go-version-comparison">
+                            <option value="">Exact Match</option>
+                            <option value="greater">Greater Than</option>
+                            <option value="greater_equal">Greater or Equal</option>
+                            <option value="less">Less Than</option>
+                            <option value="less_equal">Less or Equal</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group library-filters">
+                        <label for="search-library">Library Filters:</label>
+               <div class="library-inputs">
+                   <div class="autocomplete-container">
+                       <input type="text" id="search-library" placeholder="Library name (e.g., gin, echo, fiber)" autocomplete="off">
+                       <div id="library-dropdown" class="autocomplete-dropdown" style="display: none;"></div>
+                   </div>
+                   <div class="autocomplete-container">
+                       <input type="text" id="search-library-version" placeholder="Version (e.g., v1.9.1)" autocomplete="off" disabled>
+                       <div id="library-version-dropdown" class="autocomplete-dropdown" style="display: none;"></div>
+                   </div>
+                   <select id="version-comparison">
+                       <option value="exact">Exact Match</option>
+                       <option value="gte">Greater or Equal</option>
+                       <option value="lte">Less or Equal</option>
+                       <option value="gt">Greater Than</option>
+                       <option value="lt">Less Than</option>
+                   </select>
+               </div>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="search-group">Group:</label>
+                        <input type="text" id="search-group" placeholder="e.g., nghis">
+                    </div>
+                    <div class="form-group">
+                        <label for="search-tag">Tag:</label>
+                        <input type="text" id="search-tag" placeholder="e.g., services">
+                    </div>
+                </div>
+                <button onclick="searchProjects()">Search Projects</button>
+                <button onclick="clearSearch()">Clear Search</button>
+            </div>
+
+            <div class="section">
+                <div id="project-results" class="project-results" style="display: none;">
+                    <h3>Search Results</h3>
+                    <div id="search-stats" class="search-stats" style="display: none;"></div>
+                    <div id="projects-list"></div>
+                </div>
+            </div>            
+
+            <!-- Architecture Generation Section -->
+            <div class="section">
+                <h3>🏗️ Architecture Generation</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="architecture-type">Architecture Type:</label>
+                        <select id="architecture-type" onchange="toggleArchitectureOptions()">
+                            <option value="single">Single Module</option>
+                            <option value="full">Full Architecture (All Projects)</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="single-module-options">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="module">Module/Service:</label>
+                            <div class="autocomplete-container">
+                                <input type="text" id="module" placeholder="e.g., drg or full module path" autocomplete="off">
+                                <div id="module-dropdown" class="autocomplete-dropdown" style="display: none;"></div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="radius">Radius:</label>
+                            <input type="number" id="radius" value="1" min="0" max="5">
+                        </div>
+                        <div class="form-group">
+                            <label for="ref">Git Ref:</label>
+                            <input type="text" id="ref" placeholder="branch/commit (optional)">
+                        </div>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="ignore">Ignore:</label>
+                        <input type="text" id="ignore" placeholder="archived,sandbox" value="archived,sandbox">
+                    </div>
+                    <div class="form-group">
+                        <label for="format">Format:</label>
+                        <select id="format">
+                            <option value="mermaid">Mermaid</option>
+                            <option value="json">JSON</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="show-clients-only">Show Only Clients:</label>
+                        <input type="checkbox" id="show-clients-only" title="Show only client dependencies (API clients, not regular libraries)">
+                    </div>
+                </div>
+                <button onclick="generateArchitecture()">Generate Architecture</button>
+                <button onclick="loadArchitectureFiles()">Load Saved Files</button>
+                <div id="architecture-results" class="architecture-results" style="display: none;">
+                    <h4>Generated Architecture</h4>
+                    <div id="architecture-content"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="content">
+            <div id="error" class="error" style="display: none;"></div>
+            <div id="loading" class="loading" style="display: none;">
+                <div style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto;"></div>
+                <p id="loading-text">Loading...</p>
+            </div>
+            
+            <!-- Enhanced loading overlay -->
+            <div id="loading-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center;">
+                <div style="background: white; padding: 30px; border-radius: 10px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+                    <div style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+                    <h3 id="loading-overlay-text" style="margin: 0; color: #2c3e50;">Loading...</h3>
+                    <p id="loading-overlay-subtext" style="margin: 10px 0 0; color: #7f8c8d; font-size: 14px;"></p>
+                </div>
+            </div>
+            
+            <div id="architecture-container" class="architecture-container" style="display: none;">
+                <div id="architecture-content"></div>
+            </div>
+            
+            <div id="file-list" class="file-list" style="display: none;">
+                <h3>Available Architecture Files</h3>
+                <div id="files"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        
+        // Test API connection on page load
+        window.addEventListener('load', async function() {
+            try {
+                const response = await fetch('/health');
+                if (response.ok) {
+                    console.log('✅ API server is running');
+                } else {
+                    console.warn('⚠️ API server health check failed');
+                }
+                
+                // Load saved configuration
+                loadConfiguration();
+                
+                // Initialize autocomplete functionality
+                initGoVersionAutocomplete();
+                initLibraryAutocomplete();
+                initLibraryVersionAutocomplete();
+                initModuleAutocomplete();
+                
+                // Load cache stats
+                loadCacheStats();
+            } catch (error) {
+                console.error('❌ Cannot connect to API server:', error);
+                showError('Cannot connect to API server. Please make sure the server is running.');
+            }
+        });
+        
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+        
+        function showLoading(show, text = 'Loading...') {
+            const loadingElement = document.getElementById('loading');
+            const loadingTextElement = document.getElementById('loading-text');
+            
+            if (show) {
+                loadingTextElement.textContent = text;
+                loadingElement.style.display = 'block';
+            } else {
+                loadingElement.style.display = 'none';
+            }
+        }
+        
+        function showLoadingOverlay(show, text = 'Loading...', subtext = '') {
+            const overlay = document.getElementById('loading-overlay');
+            const textElement = document.getElementById('loading-overlay-text');
+            const subtextElement = document.getElementById('loading-overlay-subtext');
+            
+            if (show) {
+                textElement.textContent = text;
+                subtextElement.textContent = subtext;
+                overlay.style.display = 'flex';
+            } else {
+                overlay.style.display = 'none';
+            }
+        }
+        
+        // Toggle architecture options based on type
+        function toggleArchitectureOptions() {
+            const type = document.getElementById('architecture-type').value;
+            const singleOptions = document.getElementById('single-module-options');
+            
+            if (type === 'single') {
+                singleOptions.style.display = 'block';
+            } else {
+                singleOptions.style.display = 'none';
+            }
+        }
+        
+        async function generateArchitecture() {
+            const type = document.getElementById('architecture-type').value;
+            const format = document.getElementById('format').value || 'mermaid';
+            
+            // Check if token is configured
+            const token = document.getElementById('gitlab-token').value;
+            if (!token.trim()) {
+                showError('Please configure your GitLab API token first');
+                return;
+            }
+            
+            showLoading(true);
+            document.getElementById('architecture-results').style.display = 'none';
+            
+            try {
+                let response;
+                
+                if (type === 'full') {
+                    // Generate full architecture for all projects
+                    const ignore = document.getElementById('ignore').value;
+                    const showClientsOnly = document.getElementById('show-clients-only').checked;
+                    
+                    const params = new URLSearchParams();
+                    if (ignore) params.append('ignore', ignore);
+                    if (showClientsOnly) params.append('clients_only', 'true');
+                    params.append('format', format);
+                    
+                    response = await fetch(`${API_BASE}/architecture/full?${params}`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+                } else {
+                    // Generate architecture for single module
+                    const module = document.getElementById('module').value;
+                    const radius = document.getElementById('radius').value;
+                    const ref = document.getElementById('ref').value;
+                    const ignore = document.getElementById('ignore').value;
+                    const showClientsOnly = document.getElementById('show-clients-only').checked;
+                    
+                    if (!module) {
+                        alert('Please enter a module name');
+                        return;
+                    }
+                    
+                    const params = new URLSearchParams();
+                    if (module) params.append('module', module);
+                    if (radius) params.append('radius', radius);
+                    if (ref) params.append('ref', ref);
+                    if (ignore) params.append('ignore', ignore);
+                    if (showClientsOnly) params.append('clients_only', 'true');
+                    if (format) params.append('format', format);
+                    
+                    response = await fetch(`${API_BASE}/architecture?${params}`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+                }
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const content = await response.text();
+                displayArchitectureInResults(content, format);
+                
+            } catch (error) {
+                showError(`Failed to generate architecture: ${error.message}`);
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        function displayArchitectureInResults(content, format) {
+            const resultsDiv = document.getElementById('architecture-results');
+            const contentDiv = document.getElementById('architecture-content');
+            
+            if (format === 'mermaid') {
+                // Clear any existing content
+                contentDiv.innerHTML = '';
+                
+                // Create a unique ID for this diagram
+                const diagramId = 'mermaid-diagram-' + Date.now();
+                
+                // Add the mermaid content with a unique ID
+                contentDiv.innerHTML = `<div id="${diagramId}" class="mermaid">${content}</div>`;
+                
+                // Initialize Mermaid with better configuration (only once)
+                if (!window.mermaidInitialized) {
+                    mermaid.initialize({ 
+                        startOnLoad: false,
+                        theme: 'default',
+                        themeVariables: {
+                            primaryColor: '#3498db',
+                            primaryTextColor: '#2c3e50',
+                            primaryBorderColor: '#2980b9',
+                            lineColor: '#34495e',
+                            sectionBkgColor: '#ecf0f1',
+                            altSectionBkgColor: '#bdc3c7',
+                            gridColor: '#95a5a6',
+                            secondaryColor: '#e74c3c',
+                            tertiaryColor: '#f39c12'
+                        },
+                        flowchart: {
+                            useMaxWidth: false,
+                            htmlLabels: true
+                        }
+                    });
+                    window.mermaidInitialized = true;
+                }
+                
+                // Render the specific diagram
+                mermaid.init(undefined, document.getElementById(diagramId));
+            } else {
+                try {
+                    const jsonData = JSON.parse(content);
+                    contentDiv.innerHTML = `<pre>${JSON.stringify(jsonData, null, 2)}</pre>`;
+                } catch (e) {
+                    contentDiv.innerHTML = `<pre>${content}</pre>`;
+                }
+            }
+            
+            resultsDiv.style.display = 'block';
+        }
+        
+        function displayArchitecture(content, format) {
+            const container = document.getElementById('architecture-container');
+            const contentDiv = document.getElementById('architecture-content');
+            
+            if (format === 'mermaid') {
+                contentDiv.innerHTML = `<pre>${content}</pre>`;
+                // Initialize Mermaid
+                mermaid.initialize({ startOnLoad: true });
+                mermaid.init(undefined, contentDiv);
+            } else {
+                try {
+                    const data = JSON.parse(content);
+                    contentDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                } catch (e) {
+                    contentDiv.innerHTML = `<pre>${content}</pre>`;
+                }
+            }
+            
+            container.style.display = 'block';
+        }
+        
+        async function loadArchitectureFiles() {
+            try {
+                const response = await fetch(`${API_BASE}/architecture/files`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                displayFileList(data.files);
+                
+            } catch (error) {
+                showError(`Failed to load files: ${error.message}`);
+            }
+        }
+        
+        function displayFileList(files) {
+            const fileListDiv = document.getElementById('file-list');
+            const filesDiv = document.getElementById('files');
+            
+            if (files.length === 0) {
+                filesDiv.innerHTML = '<p>No architecture files found.</p>';
+            } else {
+                filesDiv.innerHTML = files.map(file => `
+                    <div class="file-item">
+                        <div class="file-info">
+                            <div class="file-name">${file.filename}</div>
+                            <div class="file-meta">
+                                ${file.type.toUpperCase()} • ${formatFileSize(file.size)} • 
+                                ${new Date(file.modified_at).toLocaleString()}
+                                ${file.module ? ` • Module: ${file.module}` : ''}
+                            </div>
+                        </div>
+                        <div class="file-actions">
+                            <button onclick="loadArchitectureFile('${file.filename}')">Load</button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            fileListDiv.style.display = 'block';
+        }
+        
+        async function loadArchitectureFile(filename) {
+            try {
+                const response = await fetch(`${API_BASE}/architecture/files/${filename}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const content = await response.text();
+                const format = filename.endsWith('.mmd') ? 'mermaid' : 'json';
+                displayArchitecture(content, format);
+                
+            } catch (error) {
+                showError(`Failed to load file: ${error.message}`);
+            }
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        // Autocomplete functionality
+        let autocompleteTimeout;
+        let cachedElements = {};
+        
+        // Performance optimization: Cache DOM elements
+        function getCachedElement(id) {
+            if (!cachedElements[id]) {
+                cachedElements[id] = document.getElementById(id);
+            }
+            return cachedElements[id];
+        }
+        
+        // Debounce utility function for performance
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+        
+        // Initialize autocomplete for Go versions
+        function initGoVersionAutocomplete() {
+            const input = getCachedElement('search-go-version');
+            const dropdown = getCachedElement('go-version-dropdown');
+            
+            // Debounced search function
+            const debouncedSearch = debounce((query) => {
+                if (query.length >= 1) {
+                    searchGoVersions(query, dropdown);
+                } else {
+                    dropdown.style.display = 'none';
+                }
+            }, 300);
+            
+            input.addEventListener('input', function() {
+                debouncedSearch(this.value);
+            });
+            
+            input.addEventListener('blur', function() {
+                setTimeout(() => {
+                    dropdown.style.display = 'none';
+                }, 200);
+            });
+            
+            input.addEventListener('focus', function() {
+                if (this.value.length >= 1) {
+                    searchGoVersions(this.value, dropdown);
+                }
+            });
+        }
+        
+       // Initialize autocomplete for libraries
+       function initLibraryAutocomplete() {
+           const input = getCachedElement('search-library');
+           const dropdown = getCachedElement('library-dropdown');
+           const versionInput = getCachedElement('search-library-version');
+           
+           // Debounced search function
+           const debouncedSearch = debounce((query) => {
+               if (query.length >= 1) {
+                   searchLibraries(query, dropdown);
+               } else {
+                   dropdown.style.display = 'none';
+                   // Disable version input when no library is selected
+                   versionInput.disabled = true;
+                   versionInput.value = '';
+               }
+           }, 300);
+           
+           input.addEventListener('input', function() {
+               debouncedSearch(this.value);
+           });
+           
+           input.addEventListener('blur', function() {
+               setTimeout(() => {
+                   dropdown.style.display = 'none';
+               }, 200);
+           });
+           
+           input.addEventListener('focus', function() {
+               if (this.value.length >= 1) {
+                   searchLibraries(this.value, dropdown);
+               }
+           });
+           
+           // When a library is selected, enable version input and load versions
+           input.addEventListener('change', function() {
+               if (this.value.trim()) {
+                   versionInput.disabled = false;
+                   versionInput.placeholder = `Version for ${this.value} (e.g., v1.9.1)`;
+               } else {
+                   versionInput.disabled = true;
+                   versionInput.value = '';
+                   versionInput.placeholder = 'Version (e.g., v1.9.1)';
+               }
+           });
+       }
+       
+       // Initialize autocomplete for library versions
+       function initLibraryVersionAutocomplete() {
+           const input = document.getElementById('search-library-version');
+           const dropdown = document.getElementById('library-version-dropdown');
+           const libraryInput = document.getElementById('search-library');
+           
+           input.addEventListener('input', function() {
+               const libraryName = libraryInput.value.trim();
+               if (!libraryName) {
+                   dropdown.style.display = 'none';
+                   return;
+               }
+               
+               const query = this.value;
+               if (query.length >= 1) {
+                   clearTimeout(autocompleteTimeout);
+                   autocompleteTimeout = setTimeout(() => {
+                       searchLibraryVersions(libraryName, query, dropdown);
+                   }, 300);
+               } else {
+                   dropdown.style.display = 'none';
+               }
+           });
+           
+           input.addEventListener('blur', function() {
+               setTimeout(() => {
+                   dropdown.style.display = 'none';
+               }, 200);
+           });
+           
+           input.addEventListener('focus', function() {
+               const libraryName = libraryInput.value.trim();
+               if (libraryName && this.value.length >= 1) {
+                   searchLibraryVersions(libraryName, this.value, dropdown);
+               }
+           });
+       }
+       
+       // Initialize autocomplete for modules
+       function initModuleAutocomplete() {
+           const input = document.getElementById('module');
+           const dropdown = document.getElementById('module-dropdown');
+           
+           input.addEventListener('input', function() {
+               const query = this.value;
+               if (query.length >= 1) {
+                   clearTimeout(autocompleteTimeout);
+                   autocompleteTimeout = setTimeout(() => {
+                       searchModules(query, dropdown);
+                   }, 300);
+               } else {
+                   dropdown.style.display = 'none';
+               }
+           });
+           
+           input.addEventListener('blur', function() {
+               setTimeout(() => {
+                   dropdown.style.display = 'none';
+               }, 200);
+           });
+           
+           input.addEventListener('focus', function() {
+               if (this.value.length >= 1) {
+                   searchModules(this.value, dropdown);
+               }
+           });
+       }
+       
+       // Search modules from cache
+       async function searchModules(query, dropdown) {
+           try {
+               const response = await fetch(`${API_BASE}/search/modules?q=${encodeURIComponent(query)}&limit=10`);
+               if (response.ok) {
+                   const data = await response.json();
+                   displayAutocompleteResults(data.modules, dropdown, 'module', query);
+               }
+           } catch (error) {
+               console.log('Failed to search modules:', error);
+           }
+       }
+        
+        // Search Go versions from cache
+        async function searchGoVersions(query, dropdown) {
+            try {
+                const response = await fetch(`${API_BASE}/search/go-versions?q=${encodeURIComponent(query)}&limit=10`);
+                if (response.ok) {
+                    const data = await response.json();
+                    displayAutocompleteResults(data.versions, dropdown, 'search-go-version', query);
+                }
+            } catch (error) {
+                console.log('Failed to search Go versions:', error);
+            }
+        }
+        
+       // Search libraries from cache
+       async function searchLibraries(query, dropdown) {
+           try {
+               const response = await fetch(`${API_BASE}/search/libraries?q=${encodeURIComponent(query)}&limit=10`);
+               if (response.ok) {
+                   const data = await response.json();
+                   displayAutocompleteResults(data.libraries, dropdown, 'search-library', query);
+               }
+           } catch (error) {
+               console.log('Failed to search libraries:', error);
+           }
+       }
+       
+       // Search library versions from cache
+       async function searchLibraryVersions(libraryName, query, dropdown) {
+           try {
+               const response = await fetch(`${API_BASE}/search/library-versions?library=${encodeURIComponent(libraryName)}&q=${encodeURIComponent(query)}&limit=10`);
+               if (response.ok) {
+                   const data = await response.json();
+                   displayAutocompleteResults(data.versions, dropdown, 'search-library-version', query);
+               }
+           } catch (error) {
+               console.log('Failed to search library versions:', error);
+           }
+       }
+        
+        // Display autocomplete results
+        function displayAutocompleteResults(items, dropdown, inputId, query) {
+            if (items.length === 0) {
+                dropdown.style.display = 'none';
+                return;
+            }
+            
+            dropdown.innerHTML = '';
+            items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'autocomplete-item';
+                div.innerHTML = highlightMatch(item, query);
+                div.addEventListener('click', function() {
+                    document.getElementById(inputId).value = item;
+                    dropdown.style.display = 'none';
+                });
+                dropdown.appendChild(div);
+            });
+            
+            dropdown.style.display = 'block';
+        }
+        
+        // Highlight matching text in autocomplete results
+        function highlightMatch(text, query) {
+            if (!query) return text;
+            const regex = new RegExp(`(${query})`, 'gi');
+            return text.replace(regex, '<span class="autocomplete-highlight">$1</span>');
+        }
+
+        // Project search functions
+        async function searchProjects() {
+            const goVersion = document.getElementById('search-go-version').value;
+            const goVersionComparison = document.getElementById('go-version-comparison').value;
+            const library = document.getElementById('search-library').value;
+            const libraryVersion = document.getElementById('search-library-version').value;
+            const versionComparison = document.getElementById('version-comparison').value;
+            const group = document.getElementById('search-group').value;
+            const tag = document.getElementById('search-tag').value;
+            const searchMode = document.getElementById('search-mode').value;
+            
+            // Check if token is configured
+            const token = document.getElementById('gitlab-token').value;
+            if (!token.trim()) {
+                showError('Please configure your GitLab API token first');
+                return;
+            }
+            
+            // Determine loading message based on search mode
+            let loadingMessage = 'Searching Projects';
+            let loadingSubtext = 'Fetching data...';
+            
+            switch (searchMode) {
+                case 'cache':
+                    loadingMessage = 'Searching Cache';
+                    loadingSubtext = 'Looking for cached results...';
+                    break;
+                case 'live':
+                    loadingMessage = 'Live Search';
+                    loadingSubtext = 'Fetching fresh data from GitLab...';
+                    break;
+                case 'cache-first':
+                    loadingMessage = 'Smart Search';
+                    loadingSubtext = 'Checking cache first, then GitLab...';
+                    break;
+            }
+            
+            // Show enhanced loading overlay
+            showLoadingOverlay(true, loadingMessage, loadingSubtext);
+            document.getElementById('project-results').style.display = 'none';
+            
+            try {
+                const params = new URLSearchParams();
+                if (goVersion) params.append('go_version', goVersion);
+                if (goVersionComparison) params.append('go_version_comparison', goVersionComparison);
+                if (library) params.append('library', library);
+                if (libraryVersion) {
+                    params.append('version', libraryVersion);
+                    params.append('version_comparison', versionComparison);
+                }
+                if (group) params.append('group', group);
+                if (tag) params.append('tag', tag);
+                
+                // Add cache preference based on search mode
+                switch (searchMode) {
+                    case 'cache':
+                        params.append('use_cache', 'true');
+                        params.append('force_cache', 'true');
+                        break;
+                    case 'live':
+                        params.append('use_cache', 'false');
+                        break;
+                    case 'cache-first':
+                        params.append('use_cache', 'true');
+                        break;
+                }
+                
+                const response = await fetch(`${API_BASE}/projects/search?${params}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                displayProjectResults(data, searchMode);
+                
+            } catch (error) {
+                showError(`Failed to search projects: ${error.message}`);
+            } finally {
+                showLoadingOverlay(false);
+            }
+        }
+        
+        function displayProjectResults(data, searchMode = 'cache-first') {
+            const resultsDiv = document.getElementById('project-results');
+            const statsDiv = document.getElementById('search-stats');
+            const projectsDiv = document.getElementById('projects-list');
+            
+            // Show stats with cache information
+            const fromCache = data.from_cache || false;
+            const cachedAt = data.cached_at;
+            let cacheInfo = '';
+            let modeInfo = '';
+            
+            // Determine cache status based on search mode and result
+            switch (searchMode) {
+                case 'cache':
+                    if (fromCache) {
+                        cacheInfo = ' • <span style="color: #27ae60;">📦 From Cache</span>';
+                        modeInfo = ' • <span style="color: #27ae60;">Cache Mode</span>';
+                    } else {
+                        cacheInfo = ' • <span style="color: #e74c3c;">❌ No Cache Found</span>';
+                        modeInfo = ' • <span style="color: #e74c3c;">Cache Mode (No Results)</span>';
+                    }
+                    break;
+                case 'live':
+                    cacheInfo = ' • <span style="color: #3498db;">🔄 Live Data</span>';
+                    modeInfo = ' • <span style="color: #3498db;">Live Mode</span>';
+                    break;
+                case 'cache-first':
+                    if (fromCache) {
+                        cacheInfo = ' • <span style="color: #27ae60;">📦 From Cache</span>';
+                        modeInfo = ' • <span style="color: #27ae60;">Smart Mode (Cache Hit)</span>';
+                    } else {
+                        cacheInfo = ' • <span style="color: #3498db;">🔄 Live Data</span>';
+                        modeInfo = ' • <span style="color: #f39c12;">Smart Mode (Cache Miss)</span>';
+                    }
+                    break;
+            }
+            
+            statsDiv.innerHTML = `Found ${data.count} project(s) matching your criteria${cacheInfo}${modeInfo}${cachedAt ? ` • <small style="color: #7f8c8d;">Cached: ${new Date(cachedAt).toLocaleString()}</small>` : ''}`;
+            statsDiv.style.display = 'block';
+            
+            // Display projects
+            if (data.projects && data.projects.length > 0) {
+                projectsDiv.innerHTML = data.projects.map(project => `
+                    <div class="project-item">
+                        <div class="project-info">
+                            <div class="project-name">${project.name}</div>
+                            <div class="project-path">${project.path_with_namespace}</div>
+                            ${project.web_url ? `
+                                <div class="project-url">
+                                    <a href="${project.web_url}" target="_blank" rel="noopener noreferrer">
+                                        🔗 ${project.web_url}
+                                    </a>
+                                </div>
+                            ` : ''}
+                            <div class="project-details">
+                                ${project.go_version ? `
+                                    <div class="detail-item">
+                                        <div class="detail-label">Go Version</div>
+                                        <div class="detail-value">${project.go_version}</div>
+                                    </div>
+                                ` : ''}
+                                ${project.libraries && project.libraries.length > 0 ? `
+                                    <div class="detail-item">
+                                        <div class="detail-label">Libraries (${project.libraries.length})</div>
+                                        <div class="libraries-list">
+                                            ${project.libraries.map(lib => `
+                                                <div class="library-item">
+                                                    <span class="library-name">${lib.name}</span>
+                                                    <span class="library-version">${lib.version}</span>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                projectsDiv.innerHTML = '<p>No projects found matching your criteria.</p>';
+            }
+            
+            resultsDiv.style.display = 'block';
+        }
+        
+        function clearSearch() {
+            document.getElementById('search-go-version').value = '';
+            document.getElementById('go-version-comparison').value = '';
+            document.getElementById('search-library').value = '';
+            document.getElementById('search-library-version').value = '';
+            document.getElementById('search-library-version').disabled = true;
+            document.getElementById('version-comparison').value = 'exact';
+            document.getElementById('search-group').value = '';
+            document.getElementById('search-tag').value = '';
+            document.getElementById('project-results').style.display = 'none';
+        }
+        
+        // Configuration management functions
+        function loadConfiguration() {
+            // Load from localStorage
+            const savedToken = localStorage.getItem('gitlab-token');
+            const savedGroup = localStorage.getItem('gitlab-group');
+            const savedTag = localStorage.getItem('gitlab-tag');
+            
+            if (savedToken) {
+                document.getElementById('gitlab-token').value = savedToken;
+            }
+            if (savedGroup) {
+                document.getElementById('gitlab-group').value = savedGroup;
+            }
+            if (savedTag) {
+                document.getElementById('gitlab-tag').value = savedTag;
+            }
+        }
+        
+        async function saveConfiguration() {
+            const token = document.getElementById('gitlab-token').value;
+            const group = document.getElementById('gitlab-group').value;
+            const tag = document.getElementById('gitlab-tag').value;
+            
+            if (!token.trim()) {
+                showConfigStatus('Please enter a GitLab API token', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/config`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        token: token,
+                        group: group,
+                        tag: tag
+                    })
+                });
+                
+                if (response.ok) {
+                    // Save to localStorage
+                    localStorage.setItem('gitlab-token', token);
+                    localStorage.setItem('gitlab-group', group);
+                    localStorage.setItem('gitlab-tag', tag);
+                    
+                    showConfigStatus('Configuration saved successfully', 'success');
+                } else {
+                    const error = await response.text();
+                    showConfigStatus(`Failed to save configuration: ${error}`, 'error');
+                }
+            } catch (error) {
+                showConfigStatus(`Failed to save configuration: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testConnection() {
+            const token = document.getElementById('gitlab-token').value;
+            
+            if (!token.trim()) {
+                showConfigStatus('Please enter a GitLab API token first', 'warning');
+                return;
+            }
+            
+            showConfigStatus('Testing connection...', 'warning');
+            
+            try {
+                const response = await fetch(`${API_BASE}/config/test`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        token: token
+                    })
+                });
+                
+                if (response.ok) {
+                    showConfigStatus('✅ Connection successful!', 'success');
+                } else {
+                    const error = await response.text();
+                    showConfigStatus(`❌ Connection failed: ${error}`, 'error');
+                }
+            } catch (error) {
+                showConfigStatus(`❌ Connection failed: ${error.message}`, 'error');
+            }
+        }
+        
+        function showConfigStatus(message, type) {
+            const statusElement = document.getElementById('config-status');
+            statusElement.textContent = message;
+            statusElement.className = `config-status ${type}`;
+            
+            // Clear status after 5 seconds
+            setTimeout(() => {
+                statusElement.textContent = '';
+                statusElement.className = '';
+            }, 5000);
+        }
+        
+        // Cache management functions
+        async function loadInitialCache() {
+            const token = document.getElementById('gitlab-token').value;
+            if (!token.trim()) {
+                showCacheStatus('Please configure your GitLab API token first', 'error');
+                return;
+            }
+
+            showCacheStatus('Loading initial cache...', 'warning');
+            showLoadingOverlay(true, 'Loading Initial Cache', 'Fetching all projects from GitLab and analyzing Go modules...');
+
+            try {
+                const response = await fetch(`${API_BASE}/cache/load`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    showCacheStatus(`✅ Initial cache loaded: ${result.projects_cached} projects with detailed information cached`, 'success');
+                    await loadCacheStats();
+                } else {
+                    const errorData = await response.json();
+                    if (errorData.error === 'Cache service unavailable') {
+                        showCacheStatus(`⚠️ ${errorData.message}`, 'warning');
+                    } else {
+                        showCacheStatus(`❌ Failed to load initial cache: ${errorData.message || errorData}`, 'error');
+                    }
+                }
+            } catch (error) {
+                showCacheStatus(`❌ Failed to load initial cache: ${error.message}`, 'error');
+            } finally {
+                showLoadingOverlay(false);
+            }
+        }
+        
+        async function refreshCache() {
+            const token = document.getElementById('gitlab-token').value;
+            if (!token.trim()) {
+                showCacheStatus('Please configure your GitLab API token first', 'error');
+                return;
+            }
+            
+            showCacheStatus('Refreshing cache...', 'warning');
+            showLoadingOverlay(true, 'Refreshing Cache', 'Updating cached data from GitLab...');
+            
+            try {
+                const response = await fetch(`${API_BASE}/cache/refresh`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    showCacheStatus('✅ Cache refreshed successfully', 'success');
+                    await loadCacheStats();
+                } else {
+                    const errorData = await response.json();
+                    if (errorData.error === 'Cache service unavailable') {
+                        showCacheStatus(`⚠️ ${errorData.message}`, 'warning');
+                    } else {
+                        showCacheStatus(`❌ Failed to refresh cache: ${errorData.message || errorData}`, 'error');
+                    }
+                }
+            } catch (error) {
+                showCacheStatus(`❌ Failed to refresh cache: ${error.message}`, 'error');
+            } finally {
+                showLoadingOverlay(false);
+            }
+        }
+        
+        async function clearCache() {
+            const token = document.getElementById('gitlab-token').value;
+            if (!token.trim()) {
+                showCacheStatus('Please configure your GitLab API token first', 'error');
+                return;
+            }
+            
+            if (!confirm('Are you sure you want to clear all cached data? This action cannot be undone.')) {
+                return;
+            }
+            
+            showCacheStatus('Clearing cache...', 'warning');
+            showLoadingOverlay(true, 'Clearing Cache', 'Removing all cached data...');
+            
+            try {
+                const response = await fetch(`${API_BASE}/cache/clear`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    showCacheStatus('✅ Cache cleared successfully', 'success');
+                    await loadCacheStats();
+                } else {
+                    const errorData = await response.json();
+                    if (errorData.error === 'Cache service unavailable') {
+                        showCacheStatus(`⚠️ ${errorData.message}`, 'warning');
+                    } else {
+                        showCacheStatus(`❌ Failed to clear cache: ${errorData.message || errorData}`, 'error');
+                    }
+                }
+            } catch (error) {
+                showCacheStatus(`❌ Failed to clear cache: ${error.message}`, 'error');
+            } finally {
+                showLoadingOverlay(false);
+            }
+        }
+        
+        async function loadCacheStats() {
+            const token = document.getElementById('gitlab-token').value;
+            if (!token.trim()) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/cache/stats`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const stats = await response.json();
+                    displayCacheStats(stats);
+                }
+            } catch (error) {
+                console.log('Failed to load cache stats:', error);
+            }
+        }
+        
+        function displayCacheStats(stats) {
+            const statsDiv = document.getElementById('cache-stats');
+            const totalCached = document.getElementById('total-cached');
+            const cacheType = document.getElementById('cache-type');
+            const searchHashes = document.getElementById('search-hashes');
+            
+            if (stats) {
+                totalCached.textContent = stats.total_cached_projects || 0;
+                cacheType.textContent = stats.cache_type || 'Hash-Based';
+                searchHashes.textContent = stats.search_hashes ? stats.search_hashes.length : 0;
+                statsDiv.style.display = 'block';
+            }
+        }
+        
+        function showCacheStatus(message, type) {
+            const statusElement = document.getElementById('cache-status');
+            statusElement.textContent = message;
+            statusElement.className = `cache-status ${type}`;
+
+            // Clear status after 5 seconds
+            setTimeout(() => {
+                statusElement.textContent = '';
+                statusElement.className = '';
+            }, 5000);
+        }
+
+        // Check for changed projects
+        async function checkChangedProjects() {
+            const token = document.getElementById('gitlab-token').value;
+            
+            if (!token.trim()) {
+                showCacheStatus('Please configure your GitLab API token first', 'error');
+                return;
+            }
+
+            showCacheStatus('Checking for changed projects...', 'warning');
+            showLoadingOverlay(true, 'Checking Changed Projects', 'Comparing current projects with cached data...');
+
+            try {
+                const response = await fetch(`${API_BASE}/projects/changed`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.count > 0) {
+                        showCacheStatus(`✅ Found ${data.count} changed projects`, 'success');
+                        // Display changed projects
+                        displayChangedProjects(data.projects);
+                    } else {
+                        showCacheStatus('✅ No projects have changed since last cache build', 'success');
+                    }
+                } else {
+                    const errorData = await response.json();
+                    if (errorData.error === 'Cache service unavailable') {
+                        showCacheStatus(`⚠️ ${errorData.message}`, 'warning');
+                    } else {
+                        showCacheStatus(`❌ Failed to check changed projects: ${errorData.message || errorData}`, 'error');
+                    }
+                }
+            } catch (error) {
+                showCacheStatus(`❌ Failed to check changed projects: ${error.message}`, 'error');
+            } finally {
+                showLoadingOverlay(false);
+            }
+        }
+
+        // Display changed projects
+        function displayChangedProjects(projects) {
+            const resultsDiv = document.getElementById('project-results');
+            const statsDiv = document.getElementById('search-stats');
+            const projectsDiv = document.getElementById('projects-list');
+            
+            statsDiv.innerHTML = `Found ${projects.length} project(s) that have changed since last cache build`;
+            statsDiv.style.display = 'block';
+            
+            if (projects.length > 0) {
+                projectsDiv.innerHTML = projects.map(project => `
+                    <div class="project-item">
+                        <div class="project-info">
+                            <div class="project-name">${project.name} <span style="color: #e74c3c; font-size: 12px;">(CHANGED)</span></div>
+                            <div class="project-path">${project.path_with_namespace}</div>
+                            ${project.web_url ? `
+                                <div class="project-url">
+                                    <a href="${project.web_url}" target="_blank" rel="noopener noreferrer">
+                                        🔗 ${project.web_url}
+                                    </a>
+                                </div>
+                            ` : ''}
+                            <div class="project-details">
+                                ${project.go_version ? `
+                                    <div class="detail-item">
+                                        <div class="detail-label">Go Version</div>
+                                        <div class="detail-value">${project.go_version}</div>
+                                    </div>
+                                ` : ''}
+                                ${project.libraries && project.libraries.length > 0 ? `
+                                    <div class="detail-item">
+                                        <div class="detail-label">Libraries (${project.libraries.length})</div>
+                                        <div class="libraries-list">
+                                            ${project.libraries.map(lib => `
+                                                <div class="library-item">
+                                                    <span class="library-name">${lib.name}</span>
+                                                    <span class="library-version">${lib.version}</span>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                projectsDiv.innerHTML = '<div class="no-results">No changed projects found.</div>';
+            }
+            
+            resultsDiv.style.display = 'block';
+        }
+
+        // Webhook function to refresh specific project cache
+        async function refreshProjectCache() {
+            const projectId = document.getElementById('webhook-project-id').value;
+            const token = document.getElementById('gitlab-token').value;
+            
+            if (!projectId.trim()) {
+                showCacheStatus('Please enter a project ID', 'error');
+                return;
+            }
+            
+            if (!token.trim()) {
+                showCacheStatus('Please configure your GitLab API token first', 'error');
+                return;
+            }
+
+            showCacheStatus('Refreshing project cache...', 'warning');
+            showLoadingOverlay(true, 'Refreshing Project Cache', `Updating cache for project ${projectId}...`);
+
+            try {
+                const response = await fetch(`${API_BASE}/cache/refresh-project`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        project_id: parseInt(projectId),
+                        token: token
+                    })
+                });
+
+                if (response.ok) {
+                    showCacheStatus(`✅ Project ${projectId} cache refreshed successfully`, 'success');
+                    await loadCacheStats();
+                } else {
+                    const errorData = await response.json();
+                    if (errorData.error === 'Cache service unavailable') {
+                        showCacheStatus(`⚠️ ${errorData.message}`, 'warning');
+                    } else {
+                        showCacheStatus(`❌ Failed to refresh project cache: ${errorData.message || errorData}`, 'error');
+                    }
+                }
+            } catch (error) {
+                showCacheStatus(`❌ Failed to refresh project cache: ${error.message}`, 'error');
+            } finally {
+                showLoadingOverlay(false);
+            }
+        }
+        
+        // Initialize Mermaid
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true
+            }
+        });
+    </script>
+</body>
+</html>

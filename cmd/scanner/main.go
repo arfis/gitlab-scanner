@@ -1,6 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"gitlab-list/internal/configuration"
 	"gitlab-list/internal/service/scanner"
 )
@@ -8,7 +11,8 @@ import (
 func main() {
 	cfg, err := configuration.NewConfiguration()
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Failed to load configuration: %v\n", err)
+		os.Exit(1)
 	}
 
 	//scanner.NewGoScanner(cfg).

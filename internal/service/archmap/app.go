@@ -77,6 +77,41 @@ func (a *App) Run(ref, module string, radius int, ignores []string) error {
 	return nil
 }
 
+// GenerateGraph generates a graph without writing files
+func (a *App) GenerateGraph(ref, module string, radius int, ignores []string) (*graph.Graph, error) {
+	// ----- build full graph -----
+	arch, err := scanner.NewArchScanner(a.config).
+		SetRef(ref).
+		SetIgnore(ignores...).
+		ScanGraph()
+	if err != nil {
+		return nil, err
+	}
+
+	// ----- focus or full -----
+	var fg *graph.Graph
+	if strings.TrimSpace(module) == "" {
+		// no module -> dump full graph
+		fg = arch
+	} else {
+		// module set -> focus view
+		targetID := resolveTargetNodeID(arch, module)
+		if targetID == "" {
+			return nil, fmt.Errorf("could not find node for module %q", module)
+		}
+		fg = filterGraphByRadius(arch, targetID, radius)
+	}
+
+	return fg, nil
+}
+
+// GenerateMermaid generates Mermaid representation of a graph
+func (a *App) GenerateMermaid(g *graph.Graph) (string, error) {
+	var buf strings.Builder
+	writeMermaid(&buf, g)
+	return buf.String(), nil
+}
+
 // ---------- selection / filtering ----------
 
 // resolveTargetNodeID tries to find a node by:
