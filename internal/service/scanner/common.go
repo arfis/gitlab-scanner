@@ -45,25 +45,17 @@ func parseGoVersionBytes(goMod []byte) (string, error) {
 	return "", nil
 }
 
-// deriveClientLabel tries to extract a friendly "clientName/vN" from a module path like
-// ".../openapi/clients/go/nghisclinicalclient/v2". Falls back to the full module path.
+// deriveClientLabel tries to extract a friendly label from a module path like
+// ".../openapi/clients/go/client/v3/user-service" -> "client/v3/user-service".
+// Falls back to the full module path if pattern not found.
 func deriveClientLabel(modulePath string) string {
 	parts := strings.Split(modulePath, "/")
 	for i := 0; i < len(parts)-2; i++ {
 		if parts[i] == "openapi" && i+2 < len(parts) && parts[i+1] == "clients" && parts[i+2] == "go" {
-			name := ""
-			verDir := ""
+			// Extract everything after /openapi/clients/go/
 			if i+3 < len(parts) {
-				name = parts[i+3]
-			}
-			if i+4 < len(parts) && strings.HasPrefix(parts[i+4], "v") {
-				verDir = parts[i+4]
-			}
-			if name != "" && verDir != "" {
-				return name + "/" + verDir
-			}
-			if name != "" {
-				return name
+				remainingParts := parts[i+3:]
+				return strings.Join(remainingParts, "/")
 			}
 			break
 		}

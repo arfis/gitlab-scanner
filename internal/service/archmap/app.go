@@ -51,7 +51,8 @@ func (a *App) Run(ref, module string, radius int, ignores []string) error {
 		if targetID == "" {
 			return fmt.Errorf("could not find node for module %q", module)
 		}
-		fg = filterGraphByRadius(arch, targetID, radius)
+		// Use same-package filtering for better microservice architecture view
+		fg = filterGraphBySamePackage(arch, targetID, radius)
 		base = sanitizeFileBase(module)
 	}
 
@@ -79,6 +80,11 @@ func (a *App) Run(ref, module string, radius int, ignores []string) error {
 
 // GenerateGraph generates a graph without writing files
 func (a *App) GenerateGraph(ref, module string, radius int, ignores []string) (*graph.Graph, error) {
+	return a.GenerateGraphWithOptions(ref, module, radius, ignores, true)
+}
+
+// GenerateGraphWithOptions generates a graph with additional options
+func (a *App) GenerateGraphWithOptions(ref, module string, radius int, ignores []string, samePackageOnly bool) (*graph.Graph, error) {
 	// ----- build full graph -----
 	arch, err := scanner.NewArchScanner(a.config).
 		SetRef(ref).
@@ -99,7 +105,11 @@ func (a *App) GenerateGraph(ref, module string, radius int, ignores []string) (*
 		if targetID == "" {
 			return nil, fmt.Errorf("could not find node for module %q", module)
 		}
-		fg = filterGraphByRadius(arch, targetID, radius)
+		if samePackageOnly {
+			fg = filterGraphBySamePackage(arch, targetID, radius)
+		} else {
+			fg = filterGraphByRadius(arch, targetID, radius)
+		}
 	}
 
 	return fg, nil
@@ -169,6 +179,116 @@ func lastSeg(s string) string {
 		return s[i+1:]
 	}
 	return s
+}
+
+// filterGraphBySamePackage filters the graph to show only modules that share the center node's domain prefix.
+func filterGraphBySamePackage(g *graph.Graph, center string, radius int) *graph.Graph {
+	nodesByID := make(map[string]graph.Node, len(g.Nodes))
+	for _, n := range g.Nodes {
+		nodesByID[n.ID] = n
+	}
+
+	centerNode, ok := nodesByID[center]
+	if !ok || centerNode.Type != graph.NodeService || centerNode.Meta == nil {
+		return filterGraphByRadius(g, center, radius)
+	}
+	centerModule, ok := centerNode.Meta["module"]
+	if !ok {
+		return filterGraphByRadius(g, center, radius)
+	}
+	domainPrefix := moduleDomainPrefix(centerModule)
+	if domainPrefix == "" {
+		return filterGraphByRadius(g, center, radius)
+	}
+
+	adj := map[string]map[string]bool{}
+	add := func(a, b string) {
+		if adj[a] == nil {
+			adj[a] = map[string]bool{}
+		}
+		adj[a][b] = true
+	}
+	for _, e := range g.Edges {
+		add(e.From, e.To)
+		add(e.To, e.From)
+	}
+
+	keep := map[string]bool{center: true}
+	frontier := map[string]bool{center: true}
+	for _, n := range g.Nodes {
+		if n.Type == graph.NodeService && moduleMatchesDomain(n.Meta, domainPrefix) {
+			keep[n.ID] = true
+		}
+	}
+
+	for hop := 0; hop < radius; hop++ {
+		next := map[string]bool{}
+		for v := range frontier {
+			for nb := range adj[v] {
+				if keep[nb] {
+					continue
+				}
+				nbNode, ok := nodesByID[nb]
+				include := true
+				if ok {
+					switch nbNode.Type {
+					case graph.NodeService, graph.NodeClient:
+						if !moduleMatchesDomain(nbNode.Meta, domainPrefix) {
+							include = false
+						}
+					}
+				}
+				if include {
+					keep[nb] = true
+					next[nb] = true
+				}
+			}
+		}
+		frontier = next
+		if len(frontier) == 0 {
+			break
+		}
+	}
+
+	var nodes []graph.Node
+	for _, n := range g.Nodes {
+		if keep[n.ID] {
+			nodes = append(nodes, n)
+		}
+	}
+	var edges []graph.Edge
+	for _, e := range g.Edges {
+		if keep[e.From] && keep[e.To] {
+			edges = append(edges, e)
+		}
+	}
+	return &graph.Graph{Nodes: nodes, Edges: edges}
+}
+
+func moduleDomainPrefix(module string) string {
+	module = strings.TrimSpace(module)
+	if module == "" {
+		return ""
+	}
+	if i := strings.IndexByte(module, '/'); i >= 0 {
+		return module[:i]
+	}
+	return module
+}
+
+func moduleMatchesDomain(meta map[string]string, domain string) bool {
+	if meta == nil {
+		return false
+	}
+	val, ok := meta["module"]
+	if !ok {
+		return false
+	}
+	if val == domain {
+		return true
+	}
+	prefix := domain + "/"
+	return strings.HasPrefix(val, prefix)
 }
 
 // BFS-style neighborhood filter up to N hops (treat edges as undirected for reachability).

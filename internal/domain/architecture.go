@@ -11,6 +11,14 @@ type ArchitectureResponse struct {
 	Radius      int       `json:"radius"`
 	Ref         string    `json:"ref"`
 	GeneratedAt time.Time `json:"generated_at"`
+	Libraries   []ArchitectureLibrary `json:"libraries,omitempty"`
+}
+
+// ArchitectureLibrary describes a dependency included in the architecture graph.
+type ArchitectureLibrary struct {
+	Module  string `json:"module"`
+	Label   string `json:"label,omitempty"`
+	Version string `json:"version,omitempty"`
 }
 
 // ArchitectureFile represents a saved architecture file

@@ -871,6 +871,8 @@ func (s *ProjectService) GenerateFullArchitectureWithOptions(ignores []string, c
 		Radius:      1,
 		Ref:         "cache",
 		Mermaid:     mermaidContent,
+		Graph:       s.toDomainGraph(graph),
+		Libraries:   s.extractLibraries(graph),
 		GeneratedAt: time.Now(),
 	}, nil
 }
@@ -917,6 +919,8 @@ func (s *ProjectService) GenerateArchitectureFromCacheWithOptions(ref, module st
 		Radius:      radius,
 		Ref:         ref,
 		Mermaid:     mermaidContent,
+		Graph:       s.toDomainGraph(graph),
+		Libraries:   s.extractLibraries(graph),
 		GeneratedAt: time.Now(),
 	}, nil
 }
@@ -1006,6 +1010,110 @@ func (s *ProjectService) generateArchitectureFromCacheWithOptions(projects []dom
 	return g, nil
 }
 
+func (s *ProjectService) toDomainGraph(g *graph.Graph) *domain.Graph {
+	if g == nil {
+		return nil
+	}
+	dNodes := make([]domain.Node, 0, len(g.Nodes))
+	for _, n := range g.Nodes {
+		label := ""
+		if n.Meta != nil {
+			label = n.Meta["label"]
+		}
+		dNodes = append(dNodes, domain.Node{
+			ID:    n.ID,
+			Type:  string(n.Type),
+			Label: label,
+			Meta:  n.Meta,
+		})
+	}
+	dEdges := make([]domain.Edge, 0, len(g.Edges))
+	for _, e := range g.Edges {
+		dEdges = append(dEdges, domain.Edge{
+			From:    e.From,
+			To:      e.To,
+			Rel:     e.Rel,
+			Version: e.Version,
+		})
+	}
+	return &domain.Graph{Nodes: dNodes, Edges: dEdges}
+}
+
+func (s *ProjectService) extractLibraries(g *graph.Graph) []domain.ArchitectureLibrary {
+	if g == nil {
+		return nil
+	}
+	nodesByID := make(map[string]graph.Node, len(g.Nodes))
+	for _, n := range g.Nodes {
+		nodesByID[n.ID] = n
+	}
+	libs := map[string]domain.ArchitectureLibrary{}
+	for _, n := range g.Nodes {
+		if n.Type != graph.NodeClient {
+			continue
+		}
+		module := strings.TrimPrefix(n.ID, "dep:")
+		label := ""
+		if n.Meta != nil {
+			if m := n.Meta["module"]; m != "" {
+				module = m
+			}
+			label = n.Meta["label"]
+		}
+		entry := libs[module]
+		entry.Module = module
+		if label != "" && label != module {
+			entry.Label = label
+		}
+		libs[module] = entry
+	}
+	if len(libs) == 0 {
+		return nil
+	}
+	// Attach versions by scanning edges touching the dependency nodes.
+	for _, e := range g.Edges {
+		if e.Version == "" {
+			continue
+		}
+		if n, ok := nodesByID[e.To]; ok && n.Type == graph.NodeClient {
+			module := libsKeyForNode(n)
+			entry := libs[module]
+			if entry.Module == "" {
+				entry.Module = module
+			}
+			entry.Version = e.Version
+			libs[module] = entry
+			continue
+		}
+		if n, ok := nodesByID[e.From]; ok && n.Type == graph.NodeClient {
+			module := libsKeyForNode(n)
+			entry := libs[module]
+			if entry.Module == "" {
+				entry.Module = module
+			}
+			entry.Version = e.Version
+			libs[module] = entry
+		}
+	}
+	result := make([]domain.ArchitectureLibrary, 0, len(libs))
+	for _, lib := range libs {
+		result = append(result, lib)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Module < result[j].Module
+	})
+	return result
+}
+
+func libsKeyForNode(n graph.Node) string {
+	if n.Meta != nil {
+		if m := n.Meta["module"]; m != "" {
+			return m
+		}
+	}
+	return strings.TrimPrefix(n.ID, "dep:")
+}
+
 // Helper methods for architecture generation
 func (s *ProjectService) shouldIgnoreProject(path string, ignores []string) bool {
 	for _, ignore := range ignores {
@@ -1051,22 +1159,76 @@ func (s *ProjectService) parseModuleID(path string) string {
 }
 
 func (s *ProjectService) isClientModule(moduleName string) bool {
-	// Check if this is a client module (contains "client" in the name)
-	// This should be more specific to avoid including go-libraries
-	return strings.Contains(strings.ToLower(moduleName), "client")
+	moduleName = strings.TrimSpace(moduleName)
+	if moduleName == "" {
+		return false
+	}
+	lower := strings.ToLower(moduleName)
+	if !strings.HasPrefix(lower, "git.prosoftke.sk/") {
+		return false
+	}
+	return strings.Contains(lower, "client")
 }
 
 func (s *ProjectService) deriveClientLabel(moduleName string) string {
-	// Extract a readable label from the module name
-	if i := strings.LastIndex(moduleName, "/"); i >= 0 && i+1 < len(moduleName) {
-		label := moduleName[i+1:]
-		// Remove common suffixes for cleaner display
-		label = strings.TrimSuffix(label, "-client")
-		label = strings.TrimSuffix(label, "client")
-		label = strings.TrimSuffix(label, "-v2")
-		label = strings.TrimSuffix(label, "-v1")
-		return label
+	// Try to extract a friendly "clientName/vN" from the module path like
+	// ".../openapi/clients/go/nghisclinicalclient/v2" or "client/v3/user-service"
+	parts := strings.Split(moduleName, "/")
+
+	// Look for the pattern: .../openapi/clients/go/clientName/version
+	for i := 0; i < len(parts)-2; i++ {
+		if parts[i] == "openapi" && i+2 < len(parts) && parts[i+1] == "clients" && parts[i+2] == "go" {
+			name := ""
+			verDir := ""
+			if i+3 < len(parts) {
+				name = parts[i+3]
+			}
+			if i+4 < len(parts) && strings.HasPrefix(parts[i+4], "v") {
+				verDir = parts[i+4]
+			}
+			if name != "" && verDir != "" {
+				return name + "/" + verDir
+			}
+			if name != "" {
+				return name
+			}
+			break
+		}
 	}
+
+	// Look for the pattern: .../client/version/service-name
+	for i := 0; i < len(parts)-2; i++ {
+		if parts[i] == "client" && i+1 < len(parts) && strings.HasPrefix(parts[i+1], "v") {
+			version := parts[i+1]
+			serviceName := ""
+			if i+2 < len(parts) {
+				serviceName = parts[i+2]
+			}
+			if serviceName != "" {
+				return "client/" + version + "/" + serviceName
+			}
+			return "client/" + version
+		}
+	}
+
+	// Fallback: if it contains "client", try to extract meaningful parts
+	if strings.Contains(strings.ToLower(moduleName), "client") {
+		// Find the "client" part and take everything from there
+		clientIndex := -1
+		for i, part := range parts {
+			if strings.ToLower(part) == "client" {
+				clientIndex = i
+				break
+			}
+		}
+		if clientIndex >= 0 && clientIndex+1 < len(parts) {
+			// Take from "client" onwards
+			remainingParts := parts[clientIndex:]
+			return strings.Join(remainingParts, "/")
+		}
+	}
+
+	// Final fallback: return the full module name
 	return moduleName
 }
 
