@@ -12,8 +12,8 @@ window.addEventListener('load', async function() {
             console.warn('⚠️ API server health check failed');
         }
         
-        // Load saved configuration
-        loadConfiguration();
+        // Load saved configuration from API/local storage
+        await loadConfiguration();
         
         // Initialize autocomplete functionality
         initGoVersionAutocomplete();
@@ -78,7 +78,8 @@ function toggleArchitectureOptions() {
 
 async function generateArchitecture() {
     const type = document.getElementById('architecture-type').value;
-    const format = document.getElementById('format').value || 'mermaid';
+    const formatSelect = document.getElementById('format');
+    const format = formatSelect ? (formatSelect.value || 'mermaid') : 'mermaid';
     
     // Check if token is configured
     const token = document.getElementById('gitlab-token').value;
@@ -97,10 +98,12 @@ async function generateArchitecture() {
             // Generate full architecture for all projects
             const ignore = document.getElementById('ignore').value;
             const showClientsOnly = document.getElementById('show-clients-only').checked;
+            const branch = getSelectedBranch();
             
             const params = new URLSearchParams();
             if (ignore) params.append('ignore', ignore);
             if (showClientsOnly) params.append('clients_only', 'true');
+            if (branch) params.append('branch', branch);
             params.append('format', format);
             
             response = await fetch(`${API_BASE}/architecture/full?${params}`, {
@@ -115,6 +118,7 @@ async function generateArchitecture() {
             const ref = document.getElementById('ref').value;
             const ignore = document.getElementById('ignore').value;
             const showClientsOnly = document.getElementById('show-clients-only').checked;
+            const branch = getSelectedBranch();
             
             if (!module) {
                 alert('Please enter a module name');
@@ -127,6 +131,7 @@ async function generateArchitecture() {
             if (ref) params.append('ref', ref);
             if (ignore) params.append('ignore', ignore);
             if (showClientsOnly) params.append('clients_only', 'true');
+            if (branch) params.append('branch', branch);
             if (format) params.append('format', format);
             
             response = await fetch(`${API_BASE}/architecture?${params}`, {
@@ -726,20 +731,123 @@ function clearSearch() {
 }
 
 // Configuration management functions
-function loadConfiguration() {
-    // Load from localStorage
+function getBranchSelect() {
+    return document.getElementById('gitlab-branch');
+}
+
+function ensureBranchSelectOptions(branches) {
+    const select = getBranchSelect();
+    if (!select) {
+        return;
+    }
+
+    const options = Array.isArray(branches) ? branches : [];
+    const saved = localStorage.getItem('gitlab-branch');
+    const current = select.value;
+
+    select.innerHTML = '';
+
+    if (options.length === 0) {
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'No branches configured';
+        select.appendChild(placeholder);
+        select.disabled = true;
+        return;
+    }
+
+    select.disabled = false;
+    options.forEach(branch => {
+        const option = document.createElement('option');
+        option.value = branch;
+        option.textContent = branch;
+        select.appendChild(option);
+    });
+
+    const target = options.includes(saved)
+        ? saved
+        : options.includes(current)
+            ? current
+            : options[0];
+    select.value = target;
+    localStorage.setItem('gitlab-branch', target);
+
+    if (!select.dataset.branchListenerAttached) {
+        select.addEventListener('change', () => {
+            localStorage.setItem('gitlab-branch', select.value);
+        });
+        select.dataset.branchListenerAttached = 'true';
+    }
+}
+
+function getSelectedBranch() {
+    const select = getBranchSelect();
+    return select ? (select.value || '').trim() : '';
+}
+
+async function loadConfiguration() {
+    const tokenInput = document.getElementById('gitlab-token');
+    const groupInput = document.getElementById('gitlab-group');
+    const tagInput = document.getElementById('gitlab-tag');
+
+    // Drop legacy cached value if present
+    localStorage.removeItem('gitlab-branches');
+
+    try {
+        const response = await fetch(`${API_BASE}/config`);
+        if (response.ok) {
+            const data = await response.json();
+            if (data && typeof data.group === 'string' && data.group !== '') {
+                groupInput.value = data.group;
+            }
+            if (data && typeof data.tag === 'string' && data.tag !== '') {
+                tagInput.value = data.tag;
+            }
+            if (data && typeof data.token === 'string' && data.token !== '') {
+                tokenInput.value = data.token;
+            }
+            if (data && Array.isArray(data.branches)) {
+                ensureBranchSelectOptions(data.branches);
+            }
+        } else {
+            console.warn(`Failed to load configuration: ${response.status} ${response.statusText}`);
+        }
+    } catch (error) {
+        console.warn('Failed to load configuration from API:', error);
+    }
+
     const savedToken = localStorage.getItem('gitlab-token');
-    const savedGroup = localStorage.getItem('gitlab-group');
-    const savedTag = localStorage.getItem('gitlab-tag');
-    
     if (savedToken) {
-        document.getElementById('gitlab-token').value = savedToken;
+        tokenInput.value = savedToken;
     }
-    if (savedGroup) {
-        document.getElementById('gitlab-group').value = savedGroup;
+
+    const savedGroup = localStorage.getItem('gitlab-group');
+    if (!groupInput.value && savedGroup) {
+        groupInput.value = savedGroup;
     }
-    if (savedTag) {
-        document.getElementById('gitlab-tag').value = savedTag;
+
+    const savedTag = localStorage.getItem('gitlab-tag');
+    if (!tagInput.value && savedTag) {
+        tagInput.value = savedTag;
+    }
+
+    if (!getSelectedBranch()) {
+        const savedBranch = localStorage.getItem('gitlab-branch');
+        if (savedBranch) {
+            const select = getBranchSelect();
+            if (select && Array.from(select.options).some(opt => opt.value === savedBranch)) {
+                select.value = savedBranch;
+                localStorage.setItem('gitlab-branch', savedBranch);
+            }
+        }
+    }
+
+    const branchSelect = getBranchSelect();
+    if (branchSelect && branchSelect.options.length === 0) {
+        const savedBranch = localStorage.getItem('gitlab-branch');
+        if (savedBranch) {
+            ensureBranchSelectOptions([savedBranch]);
+        }
     }
 }
 
@@ -747,7 +855,7 @@ async function saveConfiguration() {
     const token = document.getElementById('gitlab-token').value;
     const group = document.getElementById('gitlab-group').value;
     const tag = document.getElementById('gitlab-tag').value;
-    
+
     if (!token.trim()) {
         showConfigStatus('Please enter a GitLab API token', 'error');
         return;

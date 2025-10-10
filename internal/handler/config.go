@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"gitlab-list/internal/configuration"
 )
@@ -24,9 +25,10 @@ func NewConfigHandler() *ConfigHandler {
 
 // ConfigRequest represents a configuration update request
 type ConfigRequest struct {
-	Token string `json:"token"`
-	Group string `json:"group"`
-	Tag   string `json:"tag"`
+	Token    string   `json:"token"`
+	Group    string   `json:"group"`
+	Tag      string   `json:"tag"`
+	Branches []string `json:"branches"`
 }
 
 // SaveConfig handles POST /api/config
@@ -56,8 +58,18 @@ func (h *ConfigHandler) SaveConfig(w http.ResponseWriter, r *http.Request) {
 	if req.Tag != "" {
 		envContent += fmt.Sprintf("TAG=%s\n", req.Tag)
 	}
+	var branches []string
+	for _, b := range req.Branches {
+		trimmed := strings.TrimSpace(b)
+		if trimmed != "" {
+			branches = append(branches, trimmed)
+		}
+	}
+	if len(branches) > 0 {
+		envContent += fmt.Sprintf("BRANCHES=%s\n", strings.Join(branches, ","))
+	}
 
-	// Write to .env file
+	// Write to .env file - for now
 	if err := os.WriteFile(h.configPath, []byte(envContent), 0644); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to save configuration: %v", err), http.StatusInternalServerError)
 		return
@@ -130,8 +142,9 @@ func (h *ConfigHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 	// Return configuration (without sensitive data)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"group":     cfg.Group,
-		"tag":       cfg.Tag,
-		"token_set": cfg.Token != "",
+		"group":    cfg.Group,
+		"tag":      cfg.Tag,
+		"branches": cfg.Branches,
+		"token":    cfg.Token,
 	})
 }

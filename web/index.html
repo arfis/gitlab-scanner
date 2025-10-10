@@ -21,7 +21,7 @@
                 <div class="form-row">
                     <div class="form-group" style="flex: 2;">
                         <label for="gitlab-token">GitLab API Token:</label>
-                        <input type="password" id="gitlab-token" placeholder="Enter your GitLab API token">
+                        <input type="password" autocomplete="new-password" id="gitlab-token" placeholder="Enter your GitLab API token">
                         <small style="color: #7f8c8d; font-size: 12px;">Required for accessing GitLab projects</small>
                     </div>
                     <div class="form-group">
@@ -32,6 +32,11 @@
                         <label for="gitlab-tag">Tag:</label>
                         <input type="text" id="gitlab-tag" placeholder="services" value="services">
                     </div>
+                </div>
+                <div class="form-group">
+                    <label for="gitlab-branch">Branch:</label>
+                    <select id="gitlab-branch"></select>
+                    <small style="color: #7f8c8d; font-size: 12px;">Choose which branch to use for scans and architecture output.</small>
                 </div>
                 <button onclick="saveConfiguration()">Save Configuration</button>
                 <button onclick="testConnection()">Test Connection</button>

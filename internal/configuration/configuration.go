@@ -8,15 +8,16 @@ import (
 )
 
 type Configuration struct {
-	Token           string `env:"GITLAB_TOKEN"`
-	Group           string `env:"GROUP" env-default:"nghis"`
-	Tag             string `env:"TAG" env-default:"services"`
-	Port            string `env:"PORT" env-default:"8080"`
-	MongoDBURI      string `env:"MONGODB_URI" env-default:"mongodb://localhost:27017"`
-	MongoDBUsername string `env:"MONGODB_USERNAME"`
-	MongoDBPassword string `env:"MONGODB_PASSWORD"`
-	MongoDBDatabase string `env:"MONGODB_DATABASE" env-default:"gitlab_cache"`
-	CacheTTL        string `env:"CACHE_TTL" env-default:"24h"`
+	Token           string   `env:"GITLAB_TOKEN"`
+	Group           string   `env:"GROUP" env-default:"nghis"`
+	Tag             string   `env:"TAG" env-default:"services"`
+	Port            string   `env:"PORT" env-default:"8080"`
+	Branches        []string `env:"BRANCHES" env-default:"default" env-separator:","`
+	MongoDBURI      string   `env:"MONGODB_URI" env-default:"mongodb://localhost:27017"`
+	MongoDBUsername string   `env:"MONGODB_USERNAME"`
+	MongoDBPassword string   `env:"MONGODB_PASSWORD"`
+	MongoDBDatabase string   `env:"MONGODB_DATABASE" env-default:"gitlab_cache"`
+	CacheTTL        string   `env:"CACHE_TTL" env-default:"24h"`
 }
 
 func NewConfiguration() (*Configuration, error) {
