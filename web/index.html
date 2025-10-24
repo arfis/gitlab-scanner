@@ -4,143 +4,63 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GitLab Architecture Viewer</title>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css" />
-    <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
-    <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-standalone-preset.js"></script>
-    <script src="https://unpkg.com/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
     <link rel="stylesheet" href="app.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>GitLab Architecture Viewer</h1>
-            <p>Visualize your project dependencies and architecture</p>
+            <p>Visualize your project dependencies and manage library versions</p>
+        </div>
+        
+        <!-- Error Message -->
+        <div id="error" style="display: none; background: #f8d7da; color: #721c24; padding: 10px; margin: 10px 0; border-radius: 4px; border: 1px solid #f5c6cb;"></div>
+        
+        <!-- Loading Overlay (Fixed Position) -->
+        <div id="loading-overlay" style="display: none;">
+            <div class="loading-overlay-content">
+                <div class="loading-spinner"></div>
+                <div id="loading-text" class="loading-overlay-text">Loading...</div>
+            </div>
+        </div>
+        
+        <!-- Global Pending Changes Box (Fixed Position) -->
+        <div class="changes-summary" id="global-changes-summary">
+            <h4>📝 Pending Changes</h4>
+            <div class="changes-summary-content" id="global-changes-content">
+                <div class="changes-empty-state" id="global-changes-empty">
+                    <div class="changes-empty-state-icon">📋</div>
+                    <div class="changes-empty-state-text">No changes yet<br>Start editing to see pending changes</div>
+                </div>
+                <div id="global-changes-list" class="changes-list" style="display: none;"></div>
+                <div id="global-changes-actions" style="display: none;">
+                    <div class="branch-name-section">
+                        <label for="global-target-branch" class="branch-label">Target Branch:</label>
+                        <input type="text" 
+                               id="global-target-branch" 
+                               class="branch-name-input"
+                               placeholder="e.g., feature/update-dependencies">
+                    </div>
+                    <div class="changes-actions">
+                        <button onclick="clearAllChanges()" class="btn-clear-changes">
+                            ❌ Clear Changes
+                        </button>
+                        <button onclick="applyGlobalChanges()" class="btn-apply-changes">
+                            💾 Save All Changes
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <div class="controls">
-            <!-- Configuration Section -->
+            <!-- Main Project Search Section -->
             <div class="section">
-                <h3>⚙️ Configuration</h3>
-                <div class="form-row">
-                    <div class="form-group" style="flex: 2;">
-                        <label for="gitlab-token">GitLab API Token:</label>
-                        <input type="password" autocomplete="new-password" id="gitlab-token" placeholder="Enter your GitLab API token">
-                        <small style="color: #7f8c8d; font-size: 12px;">Required for accessing GitLab projects</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="gitlab-group">Group:</label>
-                        <input type="text" id="gitlab-group" placeholder="nghis" value="nghis">
-                    </div>
-                    <div class="form-group">
-                        <label for="gitlab-tag">Tag:</label>
-                        <input type="text" id="gitlab-tag" placeholder="services" value="services">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="gitlab-branch">Branch:</label>
-                    <select id="gitlab-branch"></select>
-                    <small style="color: #7f8c8d; font-size: 12px;">Choose which branch to use for scans and architecture output.</small>
-                </div>
-                <button onclick="saveConfiguration()">Save Configuration</button>
-                <button onclick="testConnection()">Test Connection</button>
-                <span id="config-status" style="margin-left: 10px; font-size: 14px;"></span>
-            </div>
-
-            <!-- GitLab URL Information -->
-            <div class="section">
-                <h3>🔗 GitLab URL Information</h3>
-                <div class="form-row">
-                    <div class="form-group" style="flex: 1;">
-                        <label for="gitlab-url">GitLab Base URL:</label>
-                        <input type="text" id="gitlab-url" placeholder="https://gitlab.com" value="https://gitlab.com" readonly>
-                        <small style="color: #7f8c8d; font-size: 12px;">Base URL for GitLab API calls</small>
-                    </div>
-                    <div class="form-group" style="flex: 1;">
-                        <label for="api-endpoint">API Endpoint:</label>
-                        <input type="text" id="api-endpoint" placeholder="/api/v4/groups/{group}/projects" readonly>
-                        <small style="color: #7f8c8d; font-size: 12px;">Current API endpoint being used</small>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group" style="flex: 1;">
-                        <label for="full-url">Full API URL:</label>
-                        <input type="text" id="full-url" placeholder="https://gitlab.com/api/v4/groups/nghis/projects" readonly>
-                        <small style="color: #7f8c8d; font-size: 12px;">Complete URL being parsed for projects</small>
-                    </div>
-                    <div class="form-group">
-                        <button onclick="updateUrlDisplay()">🔄 Update URL</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Cache Management Section -->
-            <div class="section">
-                <h3>💾 Cache Management</h3>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="search-mode">Search Mode:</label>
-                    <select id="search-mode">
-                        <option value="cache">Use Cache (Fast)</option>
-                        <option value="live">Live Search (Fresh Data)</option>
-                        <option value="cache-first">Cache First, then Live</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <button onclick="loadInitialCache()">📥 Load Initial Cache</button>
-                    <button onclick="refreshCache()">🔄 Refresh Cache</button>
-                    <button onclick="clearCache()">🗑️ Clear Cache</button>
-                </div>
-            </div>
-           <div class="cache-info">
-               <small>💡 <strong>Load Initial Cache</strong> fetches all projects and analyzes their Go modules (go.mod files) to populate Go versions and library dependencies. This enables fast filtering by Go version and libraries.<br>
-               🔄 <strong>Hash-Based Cache:</strong> Cache uses content hashes instead of TTL - data stays valid until manually cleared or projects change.</small>
-           </div>
-           <div class="form-row">
-               <div class="form-group">
-                   <label for="webhook-project-id">Test: Refresh Project Cache:</label>
-                   <input type="number" id="webhook-project-id" placeholder="Project ID (e.g., 123)">
-               </div>
-               <div class="form-group">
-                   <button onclick="refreshProjectCache()">🔄 Refresh Project</button>
-               </div>
-           </div>
-           <div class="cache-info">
-               <small>🔗 <strong>GitLab Webhook URL:</strong> <code>POST /api/webhook/gitlab</code><br>
-               <strong>For GitLab Integration:</strong> Add this URL to your GitLab project webhooks:<br>
-               <code>http://your-server:8080/api/webhook/gitlab?token=your_gitlab_token</code><br>
-               <strong>Or use X-Gitlab-Token header:</strong> <code>X-Gitlab-Token: your_gitlab_token</code></small>
-           </div>
-           <div class="form-row">
-               <div class="form-group">
-                   <button onclick="checkChangedProjects()">🔍 Check Changed Projects</button>
-               </div>
-           </div>
-           <div class="cache-info">
-               <small>🔍 <strong>Change Detection:</strong> Check which projects have changed since last cache build using content hash comparison. Only projects with actual changes are detected.</small>
-           </div>
-                <div id="cache-stats" class="cache-stats" style="display: none;">
-                    <div class="stats-grid">
-                        <div class="stat-item">
-                            <span class="stat-label">Total Cached:</span>
-                            <span class="stat-value" id="total-cached">0</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Cache Type:</span>
-                            <span class="stat-value" id="cache-type">Hash-Based</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Search Hashes:</span>
-                            <span class="stat-value" id="search-hashes">0</span>
-                        </div>
-                    </div>
-                </div>
-                <span id="cache-status" style="margin-left: 10px; font-size: 14px;"></span>
-            </div>
-
-            <!-- Project Search Section -->
-            <div class="section">
-                <h3>🔍 Project Search</h3>
+                <h3>🔍 Search Projects</h3>
+                <p style="color: #7f8c8d; font-size: 14px; margin-bottom: 15px;">
+                    Find and manage Go projects with library version control
+                </p>
                 <div class="form-row">
                     <div class="form-group">
                         <label for="search-go-version">Go Version:</label>
@@ -163,23 +83,23 @@
                 <div class="form-row">
                     <div class="form-group library-filters">
                         <label for="search-library">Library Filters:</label>
-               <div class="library-inputs">
-                   <div class="autocomplete-container">
-                       <input type="text" id="search-library" placeholder="Library name (e.g., gin, echo, fiber)" autocomplete="off">
-                       <div id="library-dropdown" class="autocomplete-dropdown" style="display: none;"></div>
-                   </div>
-                   <div class="autocomplete-container">
-                       <input type="text" id="search-library-version" placeholder="Version (e.g., v1.9.1)" autocomplete="off" disabled>
-                       <div id="library-version-dropdown" class="autocomplete-dropdown" style="display: none;"></div>
-                   </div>
-                   <select id="version-comparison">
-                       <option value="exact">Exact Match</option>
-                       <option value="gte">Greater or Equal</option>
-                       <option value="lte">Less or Equal</option>
-                       <option value="gt">Greater Than</option>
-                       <option value="lt">Less Than</option>
-                   </select>
-               </div>
+                        <div class="library-inputs">
+                            <div class="autocomplete-container">
+                                <input type="text" id="search-library" placeholder="Library name (e.g., gin, echo, fiber)" autocomplete="off">
+                                <div id="library-dropdown" class="autocomplete-dropdown" style="display: none;"></div>
+                            </div>
+                            <div class="autocomplete-container">
+                                <input type="text" id="search-library-version" placeholder="Version (e.g., v1.9.1)" autocomplete="off" disabled>
+                                <div id="library-version-dropdown" class="autocomplete-dropdown" style="display: none;"></div>
+                            </div>
+                            <select id="version-comparison">
+                                <option value="exact">Exact Match</option>
+                                <option value="gte">Greater or Equal</option>
+                                <option value="lte">Less or Equal</option>
+                                <option value="gt">Greater Than</option>
+                                <option value="lt">Less Than</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="form-row">
@@ -199,11 +119,152 @@
             <div class="section">
                 <div id="project-results" class="project-results" style="display: none;">
                     <h3>Search Results</h3>
+                    
+                    <!-- Quick Search Filter -->
+                    <div class="quick-search-section">
+                        <div class="quick-search-container">
+                            <input type="text" 
+                                   id="quick-search" 
+                                   class="quick-search-input" 
+                                   placeholder="🔍 Quick filter by project name..."
+                                   oninput="filterProjects()">
+                            <button onclick="clearQuickSearch()" class="btn-clear-search" title="Clear filter">✕</button>
+                        </div>
+                        <div id="filter-count" class="filter-count"></div>
+                    </div>
+                    
                     <div id="search-stats" class="search-stats" style="display: none;"></div>
                     <div id="projects-list"></div>
                 </div>
-            </div>            
+            </div>
 
+
+            <!-- Advanced Configuration (Collapsed by default) -->
+            <div class="section">
+                <h3 onclick="toggleAdvancedConfig()" style="cursor: pointer; user-select: none;">
+                    ⚙️ Advanced Configuration <span id="config-toggle">▼</span>
+                </h3>
+                <div id="advanced-config" style="display: none;">
+                    <!-- GitLab Configuration -->
+                    <div class="section">
+                        <h3>🔑 GitLab Configuration</h3>
+                        <div class="form-row">
+                            <div class="form-group" style="flex: 2;">
+                                <label for="gitlab-token">GitLab API Token:</label>
+                                <input type="password" autocomplete="new-password" id="gitlab-token" placeholder="Enter your GitLab API token">
+                                <small style="color: #7f8c8d; font-size: 12px;">Required for accessing GitLab projects</small>
+                            </div>
+                            <div class="form-group">
+                                <button onclick="testGitLabConnection()">🔗 Test Connection</button>
+                                <button onclick="saveConfiguration()">💾 Save Config</button>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex: 1;">
+                                <label for="gitlab-group">Group:</label>
+                                <input type="text" id="gitlab-group" placeholder="e.g., nghis">
+                            </div>
+                            <div class="form-group" style="flex: 1;">
+                                <label for="gitlab-tag">Tag:</label>
+                                <input type="text" id="gitlab-tag" placeholder="e.g., services">
+                            </div>
+                            <div class="form-group" style="flex: 1;">
+                                <label for="gitlab-branch">Branch:</label>
+                                <input type="text" id="gitlab-branch" placeholder="e.g., main">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- GitLab URL Information -->
+                    <div class="section">
+                        <h3>🌐 GitLab URL Information</h3>
+                        <div class="form-row">
+                            <div class="form-group" style="flex: 1;">
+                                <label for="gitlab-base-url">GitLab Base URL:</label>
+                                <input type="text" id="gitlab-base-url" readonly placeholder="Will be populated automatically">
+                            </div>
+                            <div class="form-group" style="flex: 1;">
+                                <label for="gitlab-api-endpoint">API Endpoint:</label>
+                                <input type="text" id="gitlab-api-endpoint" readonly placeholder="Will be populated automatically">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex: 1;">
+                                <label for="gitlab-full-url">Full API URL:</label>
+                                <input type="text" id="gitlab-full-url" readonly placeholder="Complete URL being parsed for projects">
+                            </div>
+                            <div class="form-group">
+                                <button onclick="updateUrlDisplay()">🔄 Update URL</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cache Management Section -->
+                    <div class="section">
+                        <h3>💾 Cache Management</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="search-mode">Search Mode:</label>
+                                <select id="search-mode">
+                                    <option value="cache">Use Cache (Fast)</option>
+                                    <option value="live">Live Search (Fresh Data)</option>
+                                    <option value="cache-first">Cache First, then Live</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <button onclick="loadInitialCache()">📥 Load Initial Cache</button>
+                                <button onclick="refreshCache()">🔄 Refresh Cache</button>
+                                <button onclick="clearCache()">🗑️ Clear Cache</button>
+                            </div>
+                        </div>
+                        <div class="cache-info">
+                            <small>💡 <strong>Load Initial Cache</strong> fetches all projects and analyzes their Go modules (go.mod files) to populate Go versions and library dependencies. This enables fast filtering by Go version and libraries.<br>
+                            🔄 <strong>Hash-Based Cache:</strong> Cache uses content hashes instead of TTL - data stays valid until manually cleared or projects change.</small>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="webhook-project-id">Test: Refresh Project Cache:</label>
+                                <input type="number" id="webhook-project-id" placeholder="Project ID (e.g., 123)">
+                            </div>
+                            <div class="form-group">
+                                <button onclick="refreshProjectCache()">🔄 Refresh Project</button>
+                            </div>
+                        </div>
+                        <div class="cache-info">
+                            <small>🔗 <strong>GitLab Webhook URL:</strong> <code>POST /api/webhook/gitlab</code><br>
+                            <strong>For GitLab Integration:</strong> Add this URL to your GitLab project webhooks:<br>
+                            <code>http://your-server:8080/api/webhook/gitlab?token=your_gitlab_token</code><br>
+                            <strong>Or use X-Gitlab-Token header:</strong> <code>X-Gitlab-Token: your_gitlab_token</code></small>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <button onclick="checkChangedProjects()">🔍 Check Changed Projects</button>
+                            </div>
+                        </div>
+                        <div class="cache-info">
+                            <small>🔍 <strong>Change Detection:</strong> Check which projects have changed since last cache build using content hash comparison. Only projects with actual changes are detected.</small>
+                        </div>
+                        <div id="cache-stats" class="cache-stats" style="display: none;">
+                            <div class="stats-grid">
+                                <div class="stat-item">
+                                    <span class="stat-label">Total Cached:</span>
+                                    <span class="stat-value" id="total-cached">0</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Cache Type:</span>
+                                    <span class="stat-value" id="cache-type">Hash-Based</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Search Hashes:</span>
+                                    <span class="stat-value" id="search-hashes">0</span>
+                                </div>
+                            </div>
+                        </div>
+                        <span id="cache-status" style="margin-left: 10px; font-size: 14px;"></span>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Architecture Generation Section -->
             <div class="section">
                 <h3>🏗️ Architecture Generation</h3>
@@ -238,121 +299,69 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="ignore">Ignore:</label>
-                        <input type="text" id="ignore" placeholder="archived,sandbox" value="archived,sandbox">
+                        <input type="text" id="ignore" placeholder="Comma-separated patterns to ignore">
                     </div>
                     <div class="form-group">
-                        <label for="show-clients-only">Show Only Clients:</label>
-                        <input type="checkbox" id="show-clients-only" title="Show only client dependencies (API clients, not regular libraries)">
+                        <label for="include-tests">Include Tests:</label>
+                        <input type="checkbox" id="include-tests">
                     </div>
                 </div>
-                <button onclick="generateArchitecture()">Generate Architecture</button>
-                <button onclick="loadArchitectureFiles()">Load Saved Files</button>
-                <div id="architecture-results" class="architecture-results" style="display: none;">
-                    <h4>Generated Architecture</h4>
-                    <div id="architecture-content"></div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <button onclick="generateArchitecture()">🏗️ Generate Architecture</button>
+                        <button onclick="downloadArchitecture()">📥 Download</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Architecture Display Section -->
+            <div class="section">
+                <div id="architecture-results" style="display: none;">
+                    <h3>Architecture Diagram</h3>
+                    <div id="architecture-diagram"></div>
                 </div>
             </div>
 
             <!-- OpenAPI Documentation Section -->
             <div class="section">
-                <h3>📋 OpenAPI Documentation</h3>
-                <p style="color: #7f8c8d; font-size: 14px; margin-bottom: 15px;">
-                    View OpenAPI specifications from your projects
-                </p>
+                <h3>📚 OpenAPI Documentation</h3>
                 <div class="form-row">
-                    <div class="form-group" style="flex: 2; position: relative;">
+                    <div class="form-group">
                         <label for="openapi-search">Search Projects:</label>
-                        <div style="display: flex; gap: 10px; position: relative;">
-                            <div style="flex: 1; position: relative;">
-                                <input type="text" id="openapi-search" placeholder="Search by project name, path, or OpenAPI content..." style="width: 100%;" onkeyup="searchOpenAPIProjects()" onfocus="showSearchResults()" onblur="hideSearchResults()">
-                                <div id="openapi-search-dropdown" class="search-dropdown" style="display: none;">
-                                    <div id="openapi-search-results-dropdown"></div>
-                                </div>
-                            </div>
-                            <button onclick="searchOpenAPIProjects()" style="padding: 8px 16px;">Search</button>
-                        </div>
+                        <input type="text" id="openapi-search" placeholder="Search for projects with OpenAPI specs">
                     </div>
                     <div class="form-group">
-                        <label for="openapi-filter">Filter by:</label>
-                        <select id="openapi-filter" onchange="filterOpenAPIProjects()">
-                            <option value="all">All Projects</option>
-                            <option value="has-openapi">Has OpenAPI</option>
-                            <option value="no-openapi">No OpenAPI</option>
-                        </select>
+                        <button onclick="loadProjectsWithOpenAPI()">🔍 Find OpenAPI Projects</button>
                     </div>
                 </div>
-                <div style="display: flex; gap: 10px; margin-top: 10px;">
-                    <button onclick="loadProjectsWithOpenAPI()">Load Projects with OpenAPI</button>
-                    <button onclick="loadAllProjectsForOpenAPI()">Load All Projects</button>
-                    <button onclick="clearOpenAPIView()">Clear View</button>
+                <div id="openapi-projects" style="display: none;">
+                    <h4>Projects with OpenAPI Documentation</h4>
+                    <div id="openapi-projects-list"></div>
                 </div>
-                
-                <!-- cURL Parser Section -->
-                <div class="curl-section" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
-                    <h4 style="margin: 0 0 10px 0; color: #2c3e50;">🔗 Find Project from cURL</h4>
-                    <p style="margin: 0 0 10px 0; color: #6c757d; font-size: 14px;">
-                        Paste a cURL command to automatically find and open the corresponding project's OpenAPI
-                    </p>
-                    <div style="display: flex; gap: 10px; align-items: flex-start;">
-                        <textarea id="curl-input" placeholder="Paste your cURL command here..." style="flex: 1; min-height: 60px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 12px; resize: vertical;"></textarea>
-                        <button onclick="parseCurlAndFindProject()" class="btn btn-primary" style="padding: 8px 16px; white-space: nowrap;">Find Project</button>
-                    </div>
-                    <div id="curl-result" style="margin-top: 10px; display: none;">
-                        <div id="curl-result-content"></div>
-                    </div>
-                </div>
-                
-                <!-- OpenAPI Viewer - appears under search when project is selected -->
-                <div id="openapi-viewer" class="openapi-viewer" style="display: none; margin-top: 20px;">
-                    <div class="openapi-viewer-header">
-                        <h3 id="openapi-viewer-title">OpenAPI Documentation</h3>
-                        <div class="openapi-viewer-actions">
-                            <button onclick="copyOpenAPIToClipboard()" class="btn btn-secondary">Copy</button>
-                            <button onclick="downloadOpenAPI()" class="btn btn-secondary">Download</button>
-                            <button onclick="debugSwaggerUI()" class="btn btn-secondary">Debug</button>
-                        </div>
-                    </div>
-                    <div id="openapi-content"></div>
-                </div>
-                
-                <!-- Placeholder when no project is selected -->
-                <div id="openapi-placeholder" class="openapi-placeholder" style="margin-top: 20px;">
-                    <div class="placeholder-content">
-                        <h3>📋 Select a Project</h3>
-                        <p>Search and select a project above to view its OpenAPI specification</p>
-                    </div>
+                <div id="openapi-content" style="display: none;">
+                    <h4>OpenAPI Documentation</h4>
+                    <div id="swagger-ui"></div>
                 </div>
             </div>
-        </div>
-        
-        <div class="content">
-            <div id="error" class="error" style="display: none;"></div>
-            <div id="loading" class="loading" style="display: none;">
-                <div style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto;"></div>
-                <p id="loading-text">Loading...</p>
-            </div>
-            
-            <!-- Enhanced loading overlay -->
-            <div id="loading-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center;">
-                <div style="background: white; padding: 30px; border-radius: 10px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
-                    <div style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
-                    <h3 id="loading-overlay-text" style="margin: 0; color: #2c3e50;">Loading...</h3>
-                    <p id="loading-overlay-subtext" style="margin: 10px 0 0; color: #7f8c8d; font-size: 14px;"></p>
-                </div>
-            </div>
-            
-            <div id="architecture-container" class="architecture-container" style="display: none;">
-                <div id="architecture-content"></div>
-            </div>
-            
-            <div id="file-list" class="file-list" style="display: none;">
-                <h3>Available Architecture Files</h3>
-                <div id="files"></div>
-            </div>
-            
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=202510244700"></script>
+    <script src="app-library-helpers.js?v=202510244700"></script>
+    <script>
+        // Toggle advanced configuration
+        function toggleAdvancedConfig() {
+            const configDiv = document.getElementById('advanced-config');
+            const toggle = document.getElementById('config-toggle');
+            
+            if (configDiv.style.display === 'none') {
+                configDiv.style.display = 'block';
+                toggle.textContent = '▲';
+            } else {
+                configDiv.style.display = 'none';
+                toggle.textContent = '▼';
+            }
+        }
+    </script>
 </body>
 </html>

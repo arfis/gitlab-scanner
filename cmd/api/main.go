@@ -52,6 +52,10 @@ func main() {
 	projectHandler := handler.NewProjectHandler(projectService)
 	configHandler := handler.NewConfigHandler()
 
+	// Initialize library updater
+	libraryUpdater := service.NewLibraryUpdater(cfg)
+	libraryUpdaterHandler := handler.NewLibraryUpdaterHandler(libraryUpdater)
+
 	// Setup routes
 	mux := http.NewServeMux()
 
@@ -111,6 +115,16 @@ func main() {
 	// Webhook routes
 	mux.HandleFunc("/api/webhook/gitlab", projectHandler.GitLabWebhook)
 
+	// Library update routes
+	mux.HandleFunc("/api/library/outdated/", libraryUpdaterHandler.GetOutdatedLibraries)
+	mux.HandleFunc("/api/library/update", libraryUpdaterHandler.UpdateLibrary)
+	mux.HandleFunc("/api/library/batch-update", libraryUpdaterHandler.BatchUpdateLibraries)
+	mux.HandleFunc("/api/library/status/", libraryUpdaterHandler.GetUpdateStatus)
+
+	// Per-project library management routes
+	mux.HandleFunc("/api/library/project/", libraryUpdaterHandler.GetProjectLibraries)
+	mux.HandleFunc("/api/library/project-update", libraryUpdaterHandler.UpdateProjectLibraries)
+
 	// Test routes
 	mux.HandleFunc("/api/test/cache", projectHandler.TestCache)
 	mux.HandleFunc("/api/debug/openapi", projectHandler.DebugOpenAPI)
@@ -118,6 +132,8 @@ func main() {
 	log.Println("Cache routes registered: /api/cache/load, /api/cache/refresh, /api/cache/clear, /api/cache/stats, /api/cache/refresh-project")
 	log.Println("Search routes registered: /api/search/libraries, /api/search/go-versions, /api/search/library-versions, /api/search/modules")
 	log.Println("Webhook routes registered: /api/webhook/gitlab")
+	log.Println("Library update routes registered: /api/library/outdated/, /api/library/update, /api/library/batch-update, /api/library/status/")
+	log.Println("Per-project library routes registered: /api/library/project/, /api/library/project-update")
 
 	// Configuration routes
 	mux.HandleFunc("/api/config", func(w http.ResponseWriter, r *http.Request) {
@@ -138,6 +154,14 @@ func main() {
 			http.NotFound(w, r)
 			return
 		}
+
+		// Add cache-busting headers for JavaScript and CSS files
+		if strings.HasSuffix(r.URL.Path, ".js") || strings.HasSuffix(r.URL.Path, ".css") {
+			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+			w.Header().Set("Pragma", "no-cache")
+			w.Header().Set("Expires", "0")
+		}
+
 		// Serve static files for all other routes
 		http.FileServer(http.Dir("./web/")).ServeHTTP(w, r)
 	})

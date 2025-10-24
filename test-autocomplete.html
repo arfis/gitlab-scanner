@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autocomplete Test</title>
+    <style>
+        .autocomplete-container {
+            position: relative;
+            display: inline-block;
+        }
+        .autocomplete-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ccc;
+            border-top: none;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+        .autocomplete-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+        .autocomplete-item:hover {
+            background: #f5f5f5;
+        }
+    </style>
+</head>
+<body>
+    <h1>Autocomplete Test</h1>
+    
+    <div class="form-group">
+        <label for="search-go-version">Go Version:</label>
+        <div class="autocomplete-container">
+            <input type="text" id="search-go-version" placeholder="e.g., 1.21, 1.20" autocomplete="off">
+            <div id="go-version-dropdown" class="autocomplete-dropdown" style="display: none;"></div>
+        </div>
+    </div>
+    
+    <div class="form-group">
+        <label for="search-library">Library:</label>
+        <div class="autocomplete-container">
+            <input type="text" id="search-library" placeholder="e.g., gin, echo, fiber" autocomplete="off">
+            <div id="library-dropdown" class="autocomplete-dropdown" style="display: none;"></div>
+        </div>
+    </div>
+    
+    <div class="form-group">
+        <label for="search-library-version">Library Version:</label>
+        <div class="autocomplete-container">
+            <input type="text" id="search-library-version" placeholder="e.g., v1.9.1" autocomplete="off" disabled>
+            <div id="library-version-dropdown" class="autocomplete-dropdown" style="display: none;"></div>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = '/api';
+        
+        // Test autocomplete functionality
+        function testAutocomplete() {
+            console.log('Testing autocomplete...');
+            
+            const goVersionInput = document.getElementById('search-go-version');
+            const goVersionDropdown = document.getElementById('go-version-dropdown');
+            
+            if (!goVersionInput || !goVersionDropdown) {
+                console.error('Elements not found');
+                return;
+            }
+            
+            console.log('Elements found, adding event listeners');
+            
+            goVersionInput.addEventListener('input', function() {
+                console.log('Go version input changed:', this.value);
+                if (this.value.length >= 1) {
+                    searchGoVersions(this.value, goVersionDropdown);
+                } else {
+                    goVersionDropdown.style.display = 'none';
+                }
+            });
+            
+            goVersionInput.addEventListener('focus', function() {
+                console.log('Go version input focused');
+                if (this.value.length >= 1) {
+                    searchGoVersions(this.value, goVersionDropdown);
+                }
+            });
+        }
+        
+        async function searchGoVersions(query, dropdown) {
+            try {
+                console.log('Fetching Go versions for query:', query);
+                const response = await fetch(`${API_BASE}/search/go-versions?q=${encodeURIComponent(query)}&limit=10`);
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Go versions response:', data);
+                    displayAutocompleteResults(data.versions, dropdown, 'search-go-version', query);
+                } else {
+                    console.error('Failed to fetch Go versions:', response.status, response.statusText);
+                }
+            } catch (error) {
+                console.error('Failed to search Go versions:', error);
+            }
+        }
+        
+        function displayAutocompleteResults(items, dropdown, inputId, query) {
+            if (items.length === 0) {
+                dropdown.style.display = 'none';
+                return;
+            }
+            
+            dropdown.innerHTML = '';
+            items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'autocomplete-item';
+                div.textContent = item;
+                div.addEventListener('click', function() {
+                    document.getElementById(inputId).value = item;
+                    dropdown.style.display = 'none';
+                });
+                dropdown.appendChild(div);
+            });
+            
+            dropdown.style.display = 'block';
+        }
+        
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', testAutocomplete);
+    </script>
+</body>
+</html>

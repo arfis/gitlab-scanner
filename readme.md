@@ -10,6 +10,7 @@ A tool for analyzing GitLab projects and their dependencies, with automatic sync
 - 🔄 **Automatic Sync**: Scheduled synchronization with configurable timing
 - 💾 **Caching**: MongoDB-based caching for improved performance
 - 🐳 **Docker Support**: Full containerization with Docker Compose
+- 📦 **Library Updates**: Update Go dependencies and create merge requests automatically
 
 ## Quick Start with Docker
 
@@ -35,6 +36,12 @@ A tool for analyzing GitLab projects and their dependencies, with automatic sync
    - API: http://localhost:8080/api
 
 For detailed Docker setup, see [DOCKER.md](DOCKER.md).
+
+## Documentation
+
+- 📖 [Library Updates Guide](LIBRARY-UPDATES.md) - How to update dependencies
+- 🔑 [GitLab Token Permissions](GITLAB-TOKEN-PERMISSIONS.md) - Required token scopes and setup
+- 🐳 [Docker Setup](DOCKER.md) - Container deployment guide
 
 ## Local Development
 

@@ -27,11 +27,17 @@ func NewProjectHandler(projectService *service.ProjectService) *ProjectHandler {
 
 // SearchProjects handles GET /api/projects/search
 func (h *ProjectHandler) SearchProjects(w http.ResponseWriter, r *http.Request) {
+	// Get library version from either 'library_version' or 'version' parameter (support both)
+	libraryVersion := r.URL.Query().Get("library_version")
+	if libraryVersion == "" {
+		libraryVersion = r.URL.Query().Get("version")
+	}
+
 	criteria := domain.SearchCriteria{
 		GoVersion:           r.URL.Query().Get("go_version"),
 		GoVersionComparison: r.URL.Query().Get("go_version_comparison"),
 		Library:             r.URL.Query().Get("library"),
-		Version:             r.URL.Query().Get("version"),
+		Version:             libraryVersion,
 		VersionComparison:   r.URL.Query().Get("version_comparison"),
 		Group:               r.URL.Query().Get("group"),
 		Tag:                 r.URL.Query().Get("tag"),

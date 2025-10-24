@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Default port
-PORT=${PORT:-8080}
+PORT=${PORT:-8100}
 
 echo -e "${BLUE}🚀 Starting GitLab Architecture Viewer...${NC}"
 

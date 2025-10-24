@@ -9,6 +9,7 @@ import (
 
 type Configuration struct {
 	Token           string   `env:"GITLAB_TOKEN"`
+	GitLabURL       string   `env:"GITLAB_URL" env-default:"https://git.prosoftke.sk"`
 	Group           string   `env:"GROUP" env-default:"nghis"`
 	Tag             string   `env:"TAG" env-default:"services"`
 	Port            string   `env:"PORT" env-default:"8080"`

@@ -2,24 +2,64 @@
 
 const API_BASE = '/api';
 
+// Utility functions
+function showError(message) {
+    const errorDiv = document.getElementById('error');
+    if (errorDiv) {
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+        } else {
+        console.error('Error:', message);
+        alert(message);
+    }
+}
+
+function showSuccess(message) {
+    const errorDiv = document.getElementById('error');
+    if (errorDiv) {
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+        errorDiv.style.background = '#d4edda';
+        errorDiv.style.color = '#155724';
+        errorDiv.style.border = '1px solid #c3e6cb';
+    } else {
+        console.log('Success:', message);
+        alert(message);
+    }
+}
+
+function showLoading(show, message = 'Loading...') {
+    const loadingDiv = document.getElementById('loading');
+    const loadingText = document.getElementById('loading-text');
+    
+    if (loadingDiv) {
+    if (show) {
+            if (loadingText) loadingText.textContent = message;
+            loadingDiv.style.display = 'block';
+    } else {
+            loadingDiv.style.display = 'none';
+        }
+    }
+}
+
 // Test API connection on page load
 window.addEventListener('load', async function() {
     try {
         const response = await fetch('/health');
         if (response.ok) {
-            console.log('✅ API server is running');
+            console.log('✅ API server is running - CACHE BUSTED! v2');
         } else {
             console.warn('⚠️ API server health check failed');
         }
-        
-        // Load saved configuration from API/local storage
-        await loadConfiguration();
         
         // Initialize autocomplete functionality
         initGoVersionAutocomplete();
         initLibraryAutocomplete();
         initLibraryVersionAutocomplete();
         initModuleAutocomplete();
+        
+        // Load configuration safely
+        await loadConfiguration();
         
         // Load cache stats
         loadCacheStats();
@@ -28,278 +68,44 @@ window.addEventListener('load', async function() {
         updateUrlDisplay();
         
         // Add event listeners for URL updates
-        document.getElementById('gitlab-group').addEventListener('input', updateUrlDisplay);
-        document.getElementById('gitlab-tag').addEventListener('input', updateUrlDisplay);
-        document.getElementById('gitlab-branch').addEventListener('change', updateUrlDisplay);
+        const groupInput = document.getElementById('gitlab-group');
+        const tagInput = document.getElementById('gitlab-tag');
+        const branchInput = document.getElementById('gitlab-branch');
+        
+        if (groupInput) groupInput.addEventListener('input', updateUrlDisplay);
+        if (tagInput) tagInput.addEventListener('input', updateUrlDisplay);
+        if (branchInput) branchInput.addEventListener('change', updateUrlDisplay);
     } catch (error) {
-        console.error('❌ Cannot connect to API server:', error);
-        showError('Cannot connect to API server. Please make sure the server is running.');
+        console.error('❌ Cannot connect to API serverr:', error);
+        showError('Cannot connect to API serverr. Please make sure the server is running.');
     }
 });
 
 function showError(message) {
     const errorDiv = document.getElementById('error');
-    errorDiv.textContent = message;
-    errorDiv.style.display = 'block';
-    setTimeout(() => {
-        errorDiv.style.display = 'none';
-    }, 5000);
+    if (errorDiv) {
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+        setTimeout(() => {
+            errorDiv.style.display = 'none';
+        }, 5000);
+    } else {
+        console.error('Error:', message);
+        alert(message);
+    }
 }
 
 function showLoading(show, text = 'Loading...') {
-    const loadingElement = document.getElementById('loading');
+    const loadingOverlay = document.getElementById('loading-overlay');
     const loadingTextElement = document.getElementById('loading-text');
     
-    if (show) {
+    if (loadingOverlay) {
+        loadingOverlay.style.display = show ? 'flex' : 'none';
+    }
+    
+    if (loadingTextElement) {
         loadingTextElement.textContent = text;
-        loadingElement.style.display = 'block';
-    } else {
-        loadingElement.style.display = 'none';
     }
-}
-
-function showLoadingOverlay(show, text = 'Loading...', subtext = '') {
-    const overlay = document.getElementById('loading-overlay');
-    const textElement = document.getElementById('loading-overlay-text');
-    const subtextElement = document.getElementById('loading-overlay-subtext');
-    
-    if (show) {
-        textElement.textContent = text;
-        subtextElement.textContent = subtext;
-        overlay.style.display = 'flex';
-    } else {
-        overlay.style.display = 'none';
-    }
-}
-
-// Toggle architecture options based on type
-function toggleArchitectureOptions() {
-    const type = document.getElementById('architecture-type').value;
-    const singleOptions = document.getElementById('single-module-options');
-    
-    if (type === 'single') {
-        singleOptions.style.display = 'block';
-    } else {
-        singleOptions.style.display = 'none';
-    }
-}
-
-async function generateArchitecture() {
-    const type = document.getElementById('architecture-type').value;
-    const formatSelect = document.getElementById('format');
-    const format = formatSelect ? (formatSelect.value || 'mermaid') : 'mermaid';
-    
-    // Check if token is configured
-    const token = document.getElementById('gitlab-token').value;
-    if (!token.trim()) {
-        showError('Please configure your GitLab API token first');
-        return;
-    }
-    
-    showLoading(true);
-    document.getElementById('architecture-results').style.display = 'none';
-    
-    try {
-        let response;
-        
-        if (type === 'full') {
-            // Generate full architecture for all projects
-            const ignore = document.getElementById('ignore').value;
-            const showClientsOnly = document.getElementById('show-clients-only').checked;
-            const branch = getSelectedBranch();
-            
-            const params = new URLSearchParams();
-            if (ignore) params.append('ignore', ignore);
-            if (showClientsOnly) params.append('clients_only', 'true');
-            if (branch) params.append('branch', branch);
-            params.append('format', format);
-            
-            response = await fetch(`${API_BASE}/architecture/full?${params}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-        } else {
-            // Generate architecture for single module
-            const module = document.getElementById('module').value;
-            const radius = document.getElementById('radius').value;
-            const ref = document.getElementById('ref').value;
-            const ignore = document.getElementById('ignore').value;
-            const showClientsOnly = document.getElementById('show-clients-only').checked;
-            const branch = getSelectedBranch();
-            
-            if (!module) {
-                alert('Please enter a module name');
-                return;
-            }
-            
-            const params = new URLSearchParams();
-            if (module) params.append('module', module);
-            if (radius) params.append('radius', radius);
-            if (ref) params.append('ref', ref);
-            if (ignore) params.append('ignore', ignore);
-            if (showClientsOnly) params.append('clients_only', 'true');
-            if (branch) params.append('branch', branch);
-            if (format) params.append('format', format);
-            
-            response = await fetch(`${API_BASE}/architecture?${params}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-        }
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const content = await response.text();
-        displayArchitectureInResults(content, format);
-        
-    } catch (error) {
-        showError(`Failed to generate architecture: ${error.message}`);
-    } finally {
-        showLoading(false);
-    }
-}
-
-function displayArchitectureInResults(content, format) {
-    const resultsDiv = document.getElementById('architecture-results');
-    const contentDiv = document.getElementById('architecture-content');
-    
-    if (format === 'mermaid') {
-        // Clear any existing content
-        contentDiv.innerHTML = '';
-        
-        // Create a unique ID for this diagram
-        const diagramId = 'mermaid-diagram-' + Date.now();
-        
-        // Add the mermaid content with a unique ID
-        contentDiv.innerHTML = `<div id="${diagramId}" class="mermaid">${content}</div>`;
-        
-        // Initialize Mermaid with better configuration (only once)
-        if (!window.mermaidInitialized) {
-            mermaid.initialize({ 
-                startOnLoad: false,
-                theme: 'default',
-                themeVariables: {
-                    primaryColor: '#3498db',
-                    primaryTextColor: '#2c3e50',
-                    primaryBorderColor: '#2980b9',
-                    lineColor: '#34495e',
-                    sectionBkgColor: '#ecf0f1',
-                    altSectionBkgColor: '#bdc3c7',
-                    gridColor: '#95a5a6',
-                    secondaryColor: '#e74c3c',
-                    tertiaryColor: '#f39c12'
-                },
-                flowchart: {
-                    useMaxWidth: false,
-                    htmlLabels: true
-                }
-            });
-            window.mermaidInitialized = true;
-        }
-        
-        // Render the specific diagram
-        mermaid.init(undefined, document.getElementById(diagramId));
-    } else {
-        try {
-            const jsonData = JSON.parse(content);
-            contentDiv.innerHTML = `<pre>${JSON.stringify(jsonData, null, 2)}</pre>`;
-        } catch (e) {
-            contentDiv.innerHTML = `<pre>${content}</pre>`;
-        }
-    }
-    
-    resultsDiv.style.display = 'block';
-}
-
-function displayArchitecture(content, format) {
-    const container = document.getElementById('architecture-container');
-    const contentDiv = document.getElementById('architecture-content');
-    
-    if (format === 'mermaid') {
-        contentDiv.innerHTML = `<pre>${content}</pre>`;
-        // Initialize Mermaid
-        mermaid.initialize({ startOnLoad: true });
-        mermaid.init(undefined, contentDiv);
-    } else {
-        try {
-            const data = JSON.parse(content);
-            contentDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-        } catch (e) {
-            contentDiv.innerHTML = `<pre>${content}</pre>`;
-        }
-    }
-    
-    container.style.display = 'block';
-}
-
-async function loadArchitectureFiles() {
-    try {
-        const response = await fetch(`${API_BASE}/architecture/files`);
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        displayFileList(data.files);
-        
-    } catch (error) {
-        showError(`Failed to load files: ${error.message}`);
-    }
-}
-
-function displayFileList(files) {
-    const fileListDiv = document.getElementById('file-list');
-    const filesDiv = document.getElementById('files');
-    
-    if (files.length === 0) {
-        filesDiv.innerHTML = '<p>No architecture files found.</p>';
-    } else {
-        filesDiv.innerHTML = files.map(file => `
-            <div class="file-item">
-                <div class="file-info">
-                    <div class="file-name">${file.filename}</div>
-                    <div class="file-meta">
-                        ${file.type.toUpperCase()} • ${formatFileSize(file.size)} • 
-                        ${new Date(file.modified_at).toLocaleString()}
-                        ${file.module ? ` • Module: ${file.module}` : ''}
-                    </div>
-                </div>
-                <div class="file-actions">
-                    <button onclick="loadArchitectureFile('${file.filename}')">Load</button>
-                </div>
-            </div>
-        `).join('');
-    }
-    
-    fileListDiv.style.display = 'block';
-}
-
-async function loadArchitectureFile(filename) {
-    try {
-        const response = await fetch(`${API_BASE}/architecture/files/${filename}`);
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const content = await response.text();
-        const format = filename.endsWith('.mmd') ? 'mermaid' : 'json';
-        displayArchitecture(content, format);
-        
-    } catch (error) {
-        showError(`Failed to load file: ${error.message}`);
-    }
-}
-
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
 // Autocomplete functionality
@@ -332,6 +138,11 @@ function initGoVersionAutocomplete() {
     const input = getCachedElement('search-go-version');
     const dropdown = getCachedElement('go-version-dropdown');
     
+    if (!input || !dropdown) {
+        console.error('Go version autocomplete elements not found');
+        return;
+    }
+    
     // Debounced search function
     const debouncedSearch = debounce((query) => {
         if (query.length >= 1) {
@@ -363,6 +174,11 @@ function initGoVersionAutocomplete() {
    const input = getCachedElement('search-library');
    const dropdown = getCachedElement('library-dropdown');
    const versionInput = getCachedElement('search-library-version');
+    
+    if (!input || !dropdown || !versionInput) {
+        console.error('Library autocomplete elements not found');
+        return;
+    }
    
    // Debounced search function
    const debouncedSearch = debounce((query) => {
@@ -396,10 +212,6 @@ function initGoVersionAutocomplete() {
    input.addEventListener('change', function() {
        if (this.value.trim()) {
            versionInput.disabled = false;
-           versionInput.placeholder = `Version for ${this.value} (e.g., v1.9.1)`;
-       } else {
-           versionInput.disabled = true;
-           versionInput.value = '';
            versionInput.placeholder = 'Version (e.g., v1.9.1)';
        }
    });
@@ -410,6 +222,10 @@ function initGoVersionAutocomplete() {
    const input = document.getElementById('search-library-version');
    const dropdown = document.getElementById('library-version-dropdown');
    const libraryInput = document.getElementById('search-library');
+    
+    if (!input || !dropdown || !libraryInput) {
+        return;
+    }
    
    input.addEventListener('input', function() {
        const libraryName = libraryInput.value.trim();
@@ -447,6 +263,10 @@ function initGoVersionAutocomplete() {
        function initModuleAutocomplete() {
    const input = document.getElementById('module');
    const dropdown = document.getElementById('module-dropdown');
+    
+    if (!input || !dropdown) {
+        return;
+    }
    
    input.addEventListener('input', function() {
        const query = this.value;
@@ -471,19 +291,6 @@ function initGoVersionAutocomplete() {
            searchModules(this.value, dropdown);
        }
    });
-       }
-       
-       // Search modules from cache
-       async function searchModules(query, dropdown) {
-   try {
-       const response = await fetch(`${API_BASE}/search/modules?q=${encodeURIComponent(query)}&limit=10`);
-       if (response.ok) {
-           const data = await response.json();
-           displayAutocompleteResults(data.modules, dropdown, 'module', query);
-       }
-   } catch (error) {
-       console.log('Failed to search modules:', error);
-   }
        }
 
 // Search Go versions from cache
@@ -525,6 +332,19 @@ async function searchGoVersions(query, dropdown) {
    }
        }
 
+// Search modules from cache
+async function searchModules(query, dropdown) {
+    try {
+        const response = await fetch(`${API_BASE}/search/modules?q=${encodeURIComponent(query)}&limit=10`);
+        if (response.ok) {
+            const data = await response.json();
+            displayAutocompleteResults(data.modules, dropdown, 'module', query);
+        }
+    } catch (error) {
+        console.log('Failed to search modules:', error);
+   }
+       }
+
 // Display autocomplete results
 function displayAutocompleteResults(items, dropdown, inputId, query) {
     if (items.length === 0) {
@@ -554,6 +374,72 @@ function highlightMatch(text, query) {
     return text.replace(regex, '<span class="autocomplete-highlight">$1</span>');
 }
 
+// Load configuration safely
+async function loadConfiguration() {
+    try {
+        const response = await fetch(`${API_BASE}/config`);
+        if (response.ok) {
+            const data = await response.json();
+            if (data && typeof data === 'object') {
+                const tokenInput = document.getElementById('gitlab-token');
+                const groupInput = document.getElementById('gitlab-group');
+                const tagInput = document.getElementById('gitlab-tag');
+                
+                if (tokenInput && typeof data.token === 'string' && data.token !== '') {
+                    tokenInput.value = data.token;
+                }
+                if (groupInput && typeof data.group === 'string' && data.group !== '') {
+                    groupInput.value = data.group;
+                }
+                if (tagInput && typeof data.tag === 'string' && data.tag !== '') {
+                    tagInput.value = data.tag;
+                }
+            }
+        }
+    } catch (error) {
+        alert("ERROR: " + error);
+        console.warn('Failed to load configuration:', error);
+    }
+}
+
+// Load cache stats
+async function loadCacheStats() {
+    try {
+        const response = await fetch(`${API_BASE}/cache/stats`);
+        if (response.ok) {
+            const stats = await response.json();
+            const statsDiv = document.getElementById('cache-stats');
+            if (statsDiv) {
+                const totalCached = document.getElementById('total-cached');
+                const cacheType = document.getElementById('cache-type');
+                const searchHashes = document.getElementById('search-hashes');
+                
+                if (totalCached) totalCached.textContent = stats.total_cached_projects || 0;
+                if (cacheType) cacheType.textContent = stats.cache_type || 'Hash-Based';
+                if (searchHashes) searchHashes.textContent = stats.search_hashes ? stats.search_hashes.length : 0;
+                statsDiv.style.display = 'block';
+            }
+        }
+    } catch (error) {
+        console.warn('Failed to load cache stats:', error);
+    }
+}
+
+// Update URL display
+function updateUrlDisplay() {
+    const group = document.getElementById('gitlab-group')?.value || '';
+    const tag = document.getElementById('gitlab-tag')?.value || '';
+    const branch = document.getElementById('gitlab-branch')?.value || '';
+    
+    const baseUrl = document.getElementById('gitlab-base-url');
+    const apiEndpoint = document.getElementById('gitlab-api-endpoint');
+    const fullUrl = document.getElementById('gitlab-full-url');
+    
+    if (baseUrl) baseUrl.value = `https://gitlab.com/api/v4`;
+    if (apiEndpoint) apiEndpoint.value = `/projects?membership=true&with_issues_enabled=true&with_merge_requests_enabled=true&with_programming_language=go&search=${group}&tag_list=${tag}`;
+    if (fullUrl) fullUrl.value = `https://gitlab.com/api/v4/projects?membership=true&with_issues_enabled=true&with_merge_requests_enabled=true&with_programming_language=go&search=${group}&tag_list=${tag}`;
+}
+
 // Project search functions
 async function searchProjects() {
     const goVersion = document.getElementById('search-go-version').value;
@@ -565,53 +451,27 @@ async function searchProjects() {
     const tag = document.getElementById('search-tag').value;
     const searchMode = document.getElementById('search-mode').value;
     
-    // Check if token is configured
     const token = document.getElementById('gitlab-token').value;
     if (!token.trim()) {
         showError('Please configure your GitLab API token first');
         return;
     }
     
-    // Determine loading message based on search mode
-    let loadingMessage = 'Searching Projects';
-    let loadingSubtext = 'Fetching data...';
-    
-    switch (searchMode) {
-        case 'cache':
-            loadingMessage = 'Searching Cache';
-            loadingSubtext = 'Looking for cached results...';
-            break;
-        case 'live':
-            loadingMessage = 'Live Search';
-            loadingSubtext = 'Fetching fresh data from GitLab...';
-            break;
-        case 'cache-first':
-            loadingMessage = 'Smart Search';
-            loadingSubtext = 'Checking cache first, then GitLab...';
-            break;
-    }
-    
-    // Show enhanced loading overlay
-    showLoadingOverlay(true, loadingMessage, loadingSubtext);
-    document.getElementById('project-results').style.display = 'none';
+    showLoading(true, 'Searching projects...');
     
     try {
         const params = new URLSearchParams();
         if (goVersion) params.append('go_version', goVersion);
         if (goVersionComparison) params.append('go_version_comparison', goVersionComparison);
         if (library) params.append('library', library);
-        if (libraryVersion) {
-            params.append('version', libraryVersion);
-            params.append('version_comparison', versionComparison);
-        }
+        if (libraryVersion) params.append('library_version', libraryVersion);
+        if (versionComparison) params.append('version_comparison', versionComparison);
         if (group) params.append('group', group);
         if (tag) params.append('tag', tag);
         
-        // Add cache preference based on search mode
         switch (searchMode) {
             case 'cache':
                 params.append('use_cache', 'true');
-                params.append('force_cache', 'true');
                 break;
             case 'live':
                 params.append('use_cache', 'false');
@@ -637,7 +497,7 @@ async function searchProjects() {
     } catch (error) {
         showError(`Failed to search projects: ${error.message}`);
     } finally {
-        showLoadingOverlay(false);
+        showLoading(false);
     }
 }
 
@@ -670,57 +530,173 @@ function displayProjectResults(data, searchMode = 'cache-first') {
         case 'cache-first':
             if (fromCache) {
                 cacheInfo = ' • <span style="color: #27ae60;">📦 From Cache</span>';
-                modeInfo = ' • <span style="color: #27ae60;">Smart Mode (Cache Hit)</span>';
+                modeInfo = ' • <span style="color: #27ae60;">Cache First</span>';
             } else {
                 cacheInfo = ' • <span style="color: #3498db;">🔄 Live Data</span>';
-                modeInfo = ' • <span style="color: #f39c12;">Smart Mode (Cache Miss)</span>';
+                modeInfo = ' • <span style="color: #3498db;">Cache First (Live Fallback)</span>';
             }
             break;
     }
     
-    statsDiv.innerHTML = `Found ${data.count} project(s) matching your criteria${cacheInfo}${modeInfo}${cachedAt ? ` • <small style="color: #7f8c8d;">Cached: ${new Date(cachedAt).toLocaleString()}</small>` : ''}`;
+    if (cachedAt) {
+        const cacheDate = new Date(cachedAt);
+        cacheInfo += ` • <span style="color: #7f8c8d;">Cached: ${cacheDate.toLocaleString()}</span>`;
+    }
+    
+    statsDiv.innerHTML = `
+        <strong>Found ${data.count || 0} project(s)</strong>${cacheInfo}${modeInfo}
+    `;
     statsDiv.style.display = 'block';
+    
+    // Store search results globally for library management
+    window.currentSearchResults = data.projects || [];
+    
+    // Debug: Log first project to see structure
+    if (data.projects && data.projects.length > 0) {
+        console.log('First project data:', data.projects[0]);
+        console.log('Libraries field:', data.projects[0].Libraries);
+        console.log('libraries field:', data.projects[0].libraries);
+    }
     
     // Display projects
     if (data.projects && data.projects.length > 0) {
-        projectsDiv.innerHTML = data.projects.map(project => `
-            <div class="project-item">
-                <div class="project-info">
-                    <div class="project-name">${project.name}</div>
-                    <div class="project-path">${project.path_with_namespace}</div>
-                    ${project.web_url ? `
-                        <div class="project-url">
-                            <a href="${project.web_url}" target="_blank" rel="noopener noreferrer">
-                                🔗 ${project.web_url}
+        projectsDiv.innerHTML = data.projects.map(project => {
+            const libraries = project.Libraries || project.libraries || [];
+            const gitlabUrl = project.web_url || `https://git.prosoftke.sk/${project.path_with_namespace}`;
+            
+            return `
+            <div class="project-item" data-project-id="${project.id}">
+                <!-- Project Header with Basic Info -->
+                <div class="project-header-section">
+                    <div class="project-header-top">
+                        <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                            <button class="collapse-btn" id="collapse-btn-${project.id}" onclick="toggleProject(${project.id})">
+                                ▼
+                            </button>
+                            <div style="flex: 1;">
+                                <h3 class="project-title">${project.name}</h3>
+                                <a href="${gitlabUrl}" target="_blank" class="project-link">
+                                    🔗 ${project.path_with_namespace || 'View on GitLab'}
                             </a>
                         </div>
-                    ` : ''}
-                    <div class="project-details">
-                        ${project.go_version ? `
-                            <div class="detail-item">
-                                <div class="detail-label">Go Version</div>
-                                <div class="detail-value">${project.go_version}</div>
                             </div>
-                        ` : ''}
-                        ${project.libraries && project.libraries.length > 0 ? `
-                            <div class="detail-item">
-                                <div class="detail-label">Libraries (${project.libraries.length})</div>
-                                <div class="libraries-list">
-                                    ${project.libraries.map(lib => `
-                                        <div class="library-item">
-                                            <span class="library-name">${lib.name}</span>
-                                            <span class="library-version">${lib.version}</span>
+                        <span class="project-id">#${project.id}</span>
                                         </div>
-                                    `).join('')}
+                    
+                    <div class="project-description">
+                        ${project.description}
                                 </div>
+                    
+                <div class="project-meta-grid">
+                    <div class="project-meta-row">
+                        <label class="meta-label">Go Version:</label>
+                        <input type="text" 
+                               id="go-version-${project.id}" 
+                               class="meta-input"
+                               value="${project.go_version || ''}"
+                               placeholder="e.g., 1.21"
+                               data-original="${project.go_version || ''}"
+                               onchange="handleGoVersionChange(${project.id}, this.value, this.dataset.original)">
                             </div>
-                        ` : ''}
+                    <div class="project-meta-row">
+                        <label class="meta-label">Branch:</label>
+                        <select id="branch-${project.id}" class="meta-select">
+                            <option value="${project.default_branch || project.DefaultBranch || 'main'}" selected>
+                                ${project.default_branch || project.DefaultBranch || 'main'} (default)
+                            </option>
+                        </select>
+                    </div>
+                    <div class="project-meta-row">
+                        <label class="meta-label">Libraries:</label>
+                        <span class="meta-value">${libraries.length} dependencies</span>
+                </div>
+                    <div class="project-meta-row">
+                        <label class="meta-label">Last Activity:</label>
+                        <span class="meta-value">${project.last_activity_at ? new Date(project.last_activity_at).toLocaleDateString() : 'N/A'}</span>
+            </div>
+                </div>
+                </div>
+                
+                <!-- Collapsible Content -->
+                <div class="project-content" id="project-content-${project.id}">
+                
+                <!-- Update Result -->
+                <div class="update-result" id="update-result-${project.id}" style="display: none;">
+                    <h4>✅ Update Successful</h4>
+                    <div id="update-result-content-${project.id}" class="update-result-content"></div>
+                </div>
+                
+                <!-- Library Management Section (Always Visible) -->
+                <div class="library-management-section" id="libraries-${project.id}">
+                    <div class="library-management-header">
+                        <h4>📦 Libraries (${libraries.length} dependencies)</h4>
+                    </div>
+                    
+                    <div class="library-management-content" id="libraries-content-${project.id}">
+                        ${libraries.length > 0 ? `
+                            <!-- Library Search -->
+                            <div class="library-search-container">
+                                <input type="text" 
+                                       id="library-search-${project.id}" 
+                                       class="library-search-input" 
+                                       placeholder="🔍 Filter libraries..."
+                                       oninput="filterLibraries(${project.id})">
+                                <button onclick="clearLibrarySearch(${project.id})" class="btn-clear-lib-search" title="Clear filter">✕</button>
+                            </div>
+                            <div class="library-summary" id="library-summary-${project.id}">
+                                Showing ${libraries.length} ${libraries.length === 1 ? 'library' : 'libraries'} • Scroll to see all
+                            </div>
+                            <div class="libraries-table" id="libraries-table-${project.id}">
+                                ${libraries.map((lib, index) => {
+                                    const libName = lib.name || lib.Name;
+                                    const libVersion = lib.version || lib.Version;
+                                    return `
+                                    <div class="library-row" data-library-index="${index}" data-library-name="${libName}">
+                                        <div class="library-name-col">
+                                            <span class="library-name">${libName}</span>
+                                        </div>
+                                        <div class="library-current-version">
+                                            <span class="version-badge">Current: ${libVersion}</span>
+                                        </div>
+                                        <div class="library-new-version">
+                                            <input type="text" 
+                                                   id="lib-version-${project.id}-${index}"
+                                                   class="version-input"
+                                                   placeholder="New version..."
+                                                   value="${libVersion}"
+                                                   data-library-name="${libName}"
+                                                   data-original="${libVersion}"
+                                                   onchange="handleLibraryVersionChange(${project.id}, '${libName}', this.value, this.dataset.original)">
+                                        </div>
+                                    </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        ` : `
+                            <div class="no-libraries-message">
+                                📦 No library information available. Please load cache first using "Load Initial Cache" button in Advanced Configuration.
+                            </div>
+                        `}
                     </div>
                 </div>
-            </div>
-        `).join('');
+                </div><!-- End project-content -->
+            </div><!-- End project-item -->
+            `;
+        }).join('');
+        
+        // Initialize version autocomplete for all version inputs
+        setTimeout(() => {
+            data.projects.forEach(project => {
+                const libraries = project.Libraries || project.libraries || [];
+                libraries.forEach((lib, index) => {
+                    initVersionAutocomplete(project.id, index, lib.name || lib.Name);
+                });
+                // Load branches for branch selector
+                loadProjectBranches(project.id, project.path_with_namespace);
+            });
+        }, 100);
     } else {
-        projectsDiv.innerHTML = '<p>No projects found matching your criteria.</p>';
+        projectsDiv.innerHTML = '<div class="no-results">No projects found matching your criteria.</div>';
     }
     
     resultsDiv.style.display = 'block';
@@ -728,230 +704,811 @@ function displayProjectResults(data, searchMode = 'cache-first') {
 
 function clearSearch() {
     document.getElementById('search-go-version').value = '';
-    document.getElementById('go-version-comparison').value = '';
     document.getElementById('search-library').value = '';
     document.getElementById('search-library-version').value = '';
-    document.getElementById('search-library-version').disabled = true;
-    document.getElementById('version-comparison').value = 'exact';
     document.getElementById('search-group').value = '';
     document.getElementById('search-tag').value = '';
-    document.getElementById('project-results').style.display = 'none';
+    
+    const resultsDiv = document.getElementById('project-results');
+    resultsDiv.style.display = 'none';
 }
 
-// Configuration management functions
-function getBranchSelect() {
-    return document.getElementById('gitlab-branch');
-}
-
-function ensureBranchSelectOptions(branches) {
-    const select = getBranchSelect();
-    if (!select) {
-        return;
-    }
-
-    const options = Array.isArray(branches) ? branches : [];
-    const saved = localStorage.getItem('gitlab-branch');
-    const current = select.value;
-
-    select.innerHTML = '';
-
-    if (options.length === 0) {
-        const placeholder = document.createElement('option');
-        placeholder.value = '';
-        placeholder.textContent = 'No branches configured';
-        select.appendChild(placeholder);
-        select.disabled = true;
-        return;
-    }
-
-    select.disabled = false;
-    options.forEach(branch => {
-        const option = document.createElement('option');
-        option.value = branch;
-        option.textContent = branch;
-        select.appendChild(option);
-    });
-
-    const target = options.includes(saved)
-        ? saved
-        : options.includes(current)
-            ? current
-            : options[0];
-    select.value = target;
-    localStorage.setItem('gitlab-branch', target);
-
-    if (!select.dataset.branchListenerAttached) {
-        select.addEventListener('change', () => {
-            localStorage.setItem('gitlab-branch', select.value);
-        });
-        select.dataset.branchListenerAttached = 'true';
-    }
-}
-
-function getSelectedBranch() {
-    const select = getBranchSelect();
-    return select ? (select.value || '').trim() : '';
-}
-
-async function loadConfiguration() {
-    const tokenInput = document.getElementById('gitlab-token');
-    const groupInput = document.getElementById('gitlab-group');
-    const tagInput = document.getElementById('gitlab-tag');
-
-    // Drop legacy cached value if present
-    localStorage.removeItem('gitlab-branches');
-
+// Load branches for a project
+async function loadProjectBranches(projectId, projectPath) {
+    const token = document.getElementById('gitlab-token').value;
+    const branchSelect = document.getElementById(`branch-${projectId}`);
+    
+    if (!token || !branchSelect) return;
+    
     try {
-        const response = await fetch(`${API_BASE}/config`);
+        // Encode the project path for URL
+        const encodedPath = encodeURIComponent(projectPath);
+        const gitlabUrl = document.getElementById('gitlab-url')?.value || 'https://git.prosoftke.sk';
+        const response = await fetch(`${gitlabUrl}/api/v4/projects/${encodedPath}/repository/branches`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (response.ok) {
+            const branches = await response.json();
+            const currentValue = branchSelect.value;
+            
+            // Populate dropdown with branches
+            branchSelect.innerHTML = branches.map(branch => `
+                <option value="${branch.name}" ${branch.name === currentValue ? 'selected' : ''}>
+                    ${branch.name}${branch.default ? ' (default)' : ''}
+                </option>
+            `).join('');
+        }
+    } catch (error) {
+        console.error('Failed to load branches:', error);
+    }
+}
+
+// Project collapse/expand functionality
+function toggleProject(projectId) {
+    const content = document.getElementById(`project-content-${projectId}`);
+    const btn = document.getElementById(`collapse-btn-${projectId}`);
+    
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        btn.textContent = '▼';
+        } else {
+        content.style.display = 'none';
+        btn.textContent = '▶';
+    }
+}
+
+// Track changes for each project
+window.projectChanges = {};
+
+function trackChange(projectId, type, data) {
+    if (!window.projectChanges[projectId]) {
+        window.projectChanges[projectId] = {
+            goVersion: null,
+            libraries: []
+        };
+    }
+    
+    if (type === 'goVersion') {
+        window.projectChanges[projectId].goVersion = data;
+    } else if (type === 'library') {
+        // Remove existing change for this library
+        window.projectChanges[projectId].libraries = 
+            window.projectChanges[projectId].libraries.filter(lib => lib.name !== data.name);
+        // Add new change
+        window.projectChanges[projectId].libraries.push(data);
+    }
+    
+    updateChangesSummary(projectId);
+}
+
+function updateChangesSummary(projectId) {
+    // Use global changes box
+    const emptyState = document.getElementById('global-changes-empty');
+    const listDiv = document.getElementById('global-changes-list');
+    const actionsWrapper = document.getElementById('global-changes-actions');
+    const branchInput = document.getElementById('global-target-branch');
+    
+    // Collect all changes from all projects
+    let allChanges = [];
+    let totalLibraries = 0;
+    let hasGoVersion = false;
+    let currentProjectId = null;
+    
+    for (const [pid, changes] of Object.entries(window.projectChanges || {})) {
+        if (changes && (changes.goVersion || changes.libraries.length > 0)) {
+            currentProjectId = pid;
+            allChanges.push({
+                projectId: pid,
+                changes: changes
+            });
+            if (changes.goVersion) hasGoVersion = true;
+            totalLibraries += changes.libraries.length;
+        }
+    }
+    
+    const hasAnyChanges = allChanges.length > 0;
+    
+    if (!hasAnyChanges) {
+        // Show empty state
+        if (emptyState) emptyState.style.display = 'block';
+        if (listDiv) listDiv.style.display = 'none';
+        if (actionsWrapper) actionsWrapper.style.display = 'none';
+        return;
+    }
+    
+    // Hide empty state, show content
+    if (emptyState) emptyState.style.display = 'none';
+    if (listDiv) listDiv.style.display = 'block';
+    if (actionsWrapper) actionsWrapper.style.display = 'block';
+    
+    // Set branch name if only one project has changes
+    if (branchInput && allChanges.length === 1) {
+        branchInput.value = `update-libraries-${Date.now()}`;
+        branchInput.dataset.projectId = currentProjectId;
+    }
+    
+    // Build HTML for all changes
+    let html = '';
+    
+    allChanges.forEach(({projectId, changes}) => {
+        const project = window.currentSearchResults?.find(p => p.id == projectId);
+        const projectName = project ? project.name : `Project #${projectId}`;
+        
+        html += `<div class="change-project-section">
+            <div class="change-project-header">${projectName}</div>`;
+        
+        if (changes.goVersion) {
+            html += `<div class="change-item">
+                <span class="change-type">Go Version:</span>
+                <span class="change-value">${changes.goVersion.from} → ${changes.goVersion.to}</span>
+            </div>`;
+        }
+        
+        if (changes.libraries.length > 0) {
+            html += `<div class="change-item">
+                <span class="change-type">Libraries (${changes.libraries.length}):</span>
+            </div>`;
+            changes.libraries.forEach(lib => {
+                html += `<div class="change-item-sub">
+                    📦 ${lib.name}: ${lib.from} → ${lib.to}
+                </div>`;
+            });
+        }
+        
+        html += `</div>`;
+    });
+    
+    listDiv.innerHTML = html;
+}
+
+function clearChanges(projectId) {
+    window.projectChanges[projectId] = {
+        goVersion: null,
+        libraries: []
+    };
+    updateChangesSummary(projectId);
+}
+
+function clearAllChanges() {
+    if (!confirm('Clear all pending changes?')) {
+        return;
+    }
+    window.projectChanges = {};
+    updateChangesSummary(null);
+}
+
+async function applyGlobalChanges() {
+    // Find which project has changes
+    let projectWithChanges = null;
+    for (const [pid, changes] of Object.entries(window.projectChanges || {})) {
+        if (changes && (changes.goVersion || changes.libraries.length > 0)) {
+            projectWithChanges = pid;
+            break;
+        }
+    }
+    
+    if (!projectWithChanges) {
+        showError('No changes to apply');
+        return;
+    }
+    
+    // Call applyAllChanges for that project
+    await applyAllChanges(projectWithChanges);
+}
+
+function handleGoVersionChange(projectId, newValue, originalValue) {
+    if (newValue !== originalValue) {
+        trackChange(projectId, 'goVersion', {
+            from: originalValue,
+            to: newValue
+        });
+        } else {
+        // Remove change if reverted to original
+        if (window.projectChanges[projectId]) {
+            window.projectChanges[projectId].goVersion = null;
+            updateChangesSummary(projectId);
+        }
+    }
+}
+
+function handleLibraryVersionChange(projectId, libraryName, newValue, originalValue) {
+    if (newValue !== originalValue) {
+        trackChange(projectId, 'library', {
+            name: libraryName,
+            from: originalValue,
+            to: newValue
+        });
+        } else {
+        // Remove change if reverted to original
+        if (window.projectChanges[projectId]) {
+            window.projectChanges[projectId].libraries = 
+                window.projectChanges[projectId].libraries.filter(lib => lib.name !== libraryName);
+            updateChangesSummary(projectId);
+        }
+    }
+}
+
+function displayUpdateResult(projectId, results, changes) {
+    const resultDiv = document.getElementById(`update-result-${projectId}`);
+    const contentDiv = document.getElementById(`update-result-content-${projectId}`);
+    
+    if (!resultDiv || !contentDiv) return;
+    
+    // Debug logging
+    console.log('displayUpdateResult called with:', { results, changes });
+    
+    // Assuming results is an array with at least one item
+    const result = Array.isArray(results) ? results[0] : results;
+    console.log('Extracted result:', result);
+    console.log('Merge request data:', result.merge_request);
+    
+    let html = '<div class="update-result-details">';
+    
+    // Show what was updated
+    if (changes.goVersion) {
+        html += `<div class="result-item">
+            <span class="result-label">Go Version:</span>
+            <span class="result-value">${changes.goVersion.from} → ${changes.goVersion.to}</span>
+        </div>`;
+    }
+    
+    if (changes.libraries && changes.libraries.length > 0) {
+        html += `<div class="result-item">
+            <span class="result-label">Updated Libraries:</span>
+            <span class="result-value">${changes.libraries.length} ${changes.libraries.length === 1 ? 'library' : 'libraries'}</span>
+        </div>`;
+        
+        changes.libraries.forEach(lib => {
+            html += `<div class="result-item-sub">
+                📦 ${lib.name}: ${lib.from} → ${lib.to}
+            </div>`;
+        });
+    }
+    
+    html += '</div>';
+    
+    // Show merge request link as a prominent button
+    if (result.merge_request && result.merge_request.web_url) {
+        html += `<div class="result-mr-section">
+            <a href="${result.merge_request.web_url}" target="_blank" class="btn-view-mr">
+                🔗 Open Merge Request #${result.merge_request.iid || result.merge_request.id} in GitLab
+            </a>
+        </div>`;
+    }
+    
+    // Show branch info
+    if (result.merge_request && result.merge_request.source_branch) {
+        html += `<div class="result-branch-info">
+            <strong>Branch:</strong> <code>${result.merge_request.source_branch}</code>
+        </div>`;
+    }
+    
+    // Add close button
+    html += `<div class="result-actions">
+        <button onclick="closeUpdateResult(${projectId})" class="btn-close-result">
+            ✕ Close
+        </button>
+    </div>`;
+    
+    contentDiv.innerHTML = html;
+    resultDiv.style.display = 'block';
+}
+
+function closeUpdateResult(projectId) {
+    const resultDiv = document.getElementById(`update-result-${projectId}`);
+    if (resultDiv) {
+        resultDiv.style.display = 'none';
+    }
+}
+
+async function applyAllChanges(projectId) {
+    const changes = window.projectChanges[projectId];
+    const token = document.getElementById('gitlab-token').value;
+
+    if (!token.trim()) {
+        showError('Please configure your GitLab API token first');
+        return;
+    }
+    
+    if (!changes || (!changes.goVersion && changes.libraries.length === 0)) {
+        showError('No changes to apply');
+        return;
+    }
+    
+    // Get custom branch name from global input
+    const branchInput = document.getElementById('global-target-branch');
+    const branchName = branchInput ? branchInput.value.trim() : '';
+    
+    if (!branchName) {
+        showError('Please enter a branch name');
+        return;
+    }
+    
+    const changeCount = (changes.goVersion ? 1 : 0) + changes.libraries.length;
+    if (!confirm(`Apply ${changeCount} change(s) to branch "${branchName}"? This will create a merge request.`)) {
+        return;
+    }
+    
+    showLoading(true, `Applying ${changeCount} changes...`);
+    
+    try {
+        const updates = changes.libraries.map(lib => ({
+            library_name: lib.name,
+            target_version: lib.to
+        }));
+        
+        const requestBody = {
+            project_id: parseInt(projectId),
+            updates: updates,
+            branch_name: branchName
+        };
+        
+        // Add go_version if it was changed
+        if (changes.goVersion && changes.goVersion.to) {
+            requestBody.go_version = changes.goVersion.to;
+        }
+        
+        const response = await fetch(`${API_BASE}/library/project-update`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+        });
+        
         if (response.ok) {
             const data = await response.json();
-            if (data && typeof data.group === 'string' && data.group !== '') {
-                groupInput.value = data.group;
-            }
-            if (data && typeof data.tag === 'string' && data.tag !== '') {
-                tagInput.value = data.tag;
-            }
-            if (data && typeof data.token === 'string' && data.token !== '') {
-                tokenInput.value = data.token;
-            }
-            if (data && Array.isArray(data.branches)) {
-                ensureBranchSelectOptions(data.branches);
-            }
+            showSuccess(`✅ Successfully applied all changes!`);
+            clearChanges(projectId);
+            // Pass the actual results array from the response
+            displayUpdateResult(projectId, data.results || data, changes);
+            console.log('Update result:', data);
         } else {
-            console.warn(`Failed to load configuration: ${response.status} ${response.statusText}`);
+            const errorData = await response.json();
+            showError(`Failed to apply changes: ${errorData.message || 'Unknown error'}`);
         }
     } catch (error) {
-        console.warn('Failed to load configuration from API:', error);
-    }
-
-    const savedToken = localStorage.getItem('gitlab-token');
-    if (savedToken) {
-        tokenInput.value = savedToken;
-    }
-
-    const savedGroup = localStorage.getItem('gitlab-group');
-    if (!groupInput.value && savedGroup) {
-        groupInput.value = savedGroup;
-    }
-
-    const savedTag = localStorage.getItem('gitlab-tag');
-    if (!tagInput.value && savedTag) {
-        tagInput.value = savedTag;
-    }
-
-    if (!getSelectedBranch()) {
-        const savedBranch = localStorage.getItem('gitlab-branch');
-        if (savedBranch) {
-            const select = getBranchSelect();
-            if (select && Array.from(select.options).some(opt => opt.value === savedBranch)) {
-                select.value = savedBranch;
-                localStorage.setItem('gitlab-branch', savedBranch);
-            }
-        }
-    }
-
-    const branchSelect = getBranchSelect();
-    if (branchSelect && branchSelect.options.length === 0) {
-        const savedBranch = localStorage.getItem('gitlab-branch');
-        if (savedBranch) {
-            ensureBranchSelectOptions([savedBranch]);
-        }
+        showError(`Failed to apply changes: ${error.message}`);
+    } finally {
+        showLoading(false);
     }
 }
 
-async function saveConfiguration() {
-    const token = document.getElementById('gitlab-token').value;
-    const group = document.getElementById('gitlab-group').value;
-    const tag = document.getElementById('gitlab-tag').value;
+// Project-specific library management functions
+let projectLibrariesCache = {};
 
+async function loadProjectLibrariesForProject(projectId, projectName) {
+    const token = document.getElementById('gitlab-token').value;
+    
     if (!token.trim()) {
-        showConfigStatus('Please enter a GitLab API token', 'error');
+        showError('Please configure your GitLab API token first');
         return;
     }
     
+    // Show the library management section for this project
+    const librariesDiv = document.getElementById(`libraries-${projectId}`);
+    const contentDiv = document.getElementById(`libraries-content-${projectId}`);
+    
+    librariesDiv.style.display = 'block';
+    contentDiv.innerHTML = '<div style="text-align: center; color: #6c757d; font-style: italic; padding: 20px;">Loading libraries...</div>';
+    
+    // First check if we have libraries in the current search results
+    const projectData = window.currentSearchResults?.find(p => p.id === projectId);
+    if (projectData && (projectData.Libraries || projectData.libraries)) {
+        const libraries = projectData.Libraries || projectData.libraries;
+        displayProjectLibrariesInResults(projectId, projectName, {
+            libraries: libraries,
+            count: libraries.length,
+            project_id: projectId
+        });
+        return;
+    }
+    
+    // If not in cache, fetch from API
     try {
-        const response = await fetch(`${API_BASE}/config`, {
+        const response = await fetch(`${API_BASE}/library/project/${projectId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            projectLibrariesCache[projectId] = data.libraries;
+            displayProjectLibrariesInResults(projectId, projectName, data);
+        } else {
+            const errorData = await response.json();
+            contentDiv.innerHTML = `<div style="color: #dc3545; text-align: center; padding: 20px;">Failed to load libraries: ${errorData.message || errorData}</div>`;
+        }
+    } catch (error) {
+        contentDiv.innerHTML = `<div style="color: #dc3545; text-align: center; padding: 20px;">Failed to load libraries: ${error.message}</div>`;
+    }
+}
+
+// Update library version function
+async function updateLibraryVersion(projectId, libraryName, currentVersion) {
+    const newVersion = prompt(`Enter new version for ${libraryName} (current: ${currentVersion}):`);
+    if (!newVersion || newVersion.trim() === '') {
+        return;
+    }
+    
+    const token = document.getElementById('gitlab-token').value;
+    if (!token.trim()) {
+        showError('Please configure your GitLab API token first');
+        return;
+    }
+    
+    showLoading(true, `Updating ${libraryName} to ${newVersion}...`);
+    
+    try {
+        const response = await fetch(`${API_BASE}/library/update`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                token: token,
-                group: group,
-                tag: tag
+                project_id: projectId,
+                library_name: libraryName,
+                target_version: newVersion.trim()
             })
         });
         
         if (response.ok) {
-            // Save to localStorage
-            localStorage.setItem('gitlab-token', token);
-            localStorage.setItem('gitlab-group', group);
-            localStorage.setItem('gitlab-tag', tag);
+            const result = await response.json();
+            showSuccess(`✅ Successfully updated ${libraryName} to ${newVersion}`);
+            // Refresh the project libraries display
+            loadProjectLibrariesForProject(projectId, '');
+        } else {
+            const errorData = await response.json();
+            showError(`❌ Failed to update library: ${errorData.message || 'Unknown error'}`);
+        }
+    } catch (error) {
+        showError(`❌ Failed to update library: ${error.message}`);
+    } finally {
+        showLoading(false);
+    }
+}
+
+function displayProjectLibrariesInResults(projectId, projectName, data) {
+    const contentDiv = document.getElementById(`libraries-content-${projectId}`);
+    
+    if (data.libraries && data.libraries.length > 0) {
+        let html = `
+            <div style="margin-bottom: 15px;">
+                <strong>Found ${data.count} libraries in ${projectName}:</strong>
+            </div>
+            <div style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 10px;">
+        `;
+        
+        data.libraries.forEach((library, index) => {
+            // Handle both API response format and cached format
+            const libName = library.library_name || library.name || library.Name;
+            const currentVer = library.current_version || library.version || library.Version;
+            const latestVer = library.latest_version || currentVer;
             
-            showConfigStatus('Configuration saved successfully', 'success');
+            html += `
+                <div style="border: 1px solid #ddd; border-radius: 4px; padding: 10px; margin-bottom: 8px; background: #f8f9fa;" 
+                     data-library-index="${index}" data-library-name="${libName}">
+                    <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                        <input type="checkbox" id="lib-${projectId}-${index}" style="margin-right: 10px;" 
+                               onchange="toggleLibrarySelectionInProject(${projectId}, ${index})">
+                        <div style="flex: 1;">
+                            <strong>${libName}</strong>
+                            <div style="color: #6c757d; font-size: 12px; margin-top: 2px;">
+                                Current: ${currentVer}
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label style="font-size: 12px; color: #6c757d;">New Version:</label>
+                        <input type="text" id="lib-version-${projectId}-${index}" 
+                               placeholder="${currentVer}" 
+                               value="${currentVer}"
+                               style="flex: 1; padding: 4px 8px; border: 1px solid #ddd; border-radius: 3px; font-size: 12px;">
+                        <button onclick="updateSingleLibraryInProject(${projectId}, ${index}, '${libName}')" 
+                                style="background: #007bff; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 11px;">
+                            Update
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += `</div>`;
+        
+        // Add batch action buttons
+        html += `
+            <div style="margin-top: 15px; display: flex; gap: 10px; justify-content: center;">
+                <button onclick="updateSelectedLibrariesInProject(${projectId})" 
+                        style="background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                    🚀 Update Selected Libraries
+                </button>
+                <button onclick="selectAllLibrariesInProject(${projectId})" 
+                        style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                    ✅ Select All
+                </button>
+                <button onclick="clearAllSelectionsInProject(${projectId})" 
+                        style="background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                    ❌ Clear All
+                </button>
+            </div>
+        `;
+        
+        contentDiv.innerHTML = html;
         } else {
-            const error = await response.text();
-            showConfigStatus(`Failed to save configuration: ${error}`, 'error');
-        }
-    } catch (error) {
-        showConfigStatus(`Failed to save configuration: ${error.message}`, 'error');
+        contentDiv.innerHTML = '<div style="text-align: center; color: #6c757d; font-style: italic;">No libraries found in this project</div>';
     }
 }
 
-async function testConnection() {
+function toggleLibrarySelectionInProject(projectId, index) {
+    const checkbox = document.getElementById(`lib-${projectId}-${index}`);
+    const container = document.querySelector(`[data-library-index="${index}"]`);
+    
+    if (checkbox.checked) {
+        container.style.borderColor = '#007bff';
+        container.style.backgroundColor = '#e7f3ff';
+    } else {
+        container.style.borderColor = '#ddd';
+        container.style.backgroundColor = '#f8f9fa';
+    }
+}
+
+function selectAllLibrariesInProject(projectId) {
+    const libraries = projectLibrariesCache[projectId] || [];
+    libraries.forEach((_, index) => {
+        const checkbox = document.getElementById(`lib-${projectId}-${index}`);
+        if (checkbox) {
+            checkbox.checked = true;
+            toggleLibrarySelectionInProject(projectId, index);
+        }
+    });
+}
+
+function clearAllSelectionsInProject(projectId) {
+    const libraries = projectLibrariesCache[projectId] || [];
+    libraries.forEach((_, index) => {
+        const checkbox = document.getElementById(`lib-${projectId}-${index}`);
+        if (checkbox) {
+            checkbox.checked = false;
+            toggleLibrarySelectionInProject(projectId, index);
+        }
+    });
+}
+
+async function updateSelectedLibrariesInProject(projectId) {
     const token = document.getElementById('gitlab-token').value;
     
     if (!token.trim()) {
-        showConfigStatus('Please enter a GitLab API token first', 'warning');
+        showError('Please configure your GitLab API token first');
+        return;
+    }
+
+    // Collect selected libraries
+    const libraries = projectLibrariesCache[projectId] || [];
+    const selectedUpdates = [];
+    
+    libraries.forEach((library, index) => {
+        const checkbox = document.getElementById(`lib-${projectId}-${index}`);
+        const versionInput = document.getElementById(`lib-version-${projectId}-${index}`);
+        
+        if (checkbox && checkbox.checked && versionInput) {
+            // Handle both field name formats
+            const libName = library.library_name || library.name || library.Name;
+            const targetVersion = versionInput.value || library.latest_version || library.version || library.Version;
+            
+            selectedUpdates.push({
+                library_name: libName,
+                target_version: targetVersion
+            });
+        }
+    });
+    
+    if (selectedUpdates.length === 0) {
+        showError('Please select at least one library to update');
         return;
     }
     
-    showConfigStatus('Testing connection...', 'warning');
-    
+    if (!confirm(`Are you sure you want to update ${selectedUpdates.length} libraries? This will create a merge request.`)) {
+        return;
+    }
+
+    showLoading(true, `Updating ${selectedUpdates.length} libraries...`);
+
     try {
-        const response = await fetch(`${API_BASE}/config/test`, {
+        const response = await fetch(`${API_BASE}/library/project-update`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                token: token
+                project_id: parseInt(projectId),
+                updates: selectedUpdates
+            })
+        });
+
+        if (response.ok) {
+            const results = await response.json();
+            displayProjectUpdateResultsInProject(projectId, results);
+        } else {
+            const errorData = await response.json();
+            showError(`Failed to update libraries: ${errorData.message || errorData}`);
+        }
+    } catch (error) {
+        showError(`Failed to update libraries: ${error.message}`);
+    } finally {
+        showLoading(false);
+    }
+}
+
+async function updateSingleLibraryInProject(projectId, index, libraryName) {
+    const token = document.getElementById('gitlab-token').value;
+    const versionInput = document.getElementById(`lib-version-${projectId}-${index}`);
+    
+    if (!token.trim()) {
+        showError('Please configure your GitLab API token first');
+        return;
+    }
+    
+    const targetVersion = versionInput.value;
+    
+    if (!targetVersion) {
+        showError('Please enter a target version');
+        return;
+    }
+    
+    showLoading(true, `Updating ${libraryName} to ${targetVersion}...`);
+    
+    try {
+        const response = await fetch(`${API_BASE}/library/project-update`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                project_id: parseInt(projectId),
+                updates: [{
+                    library_name: libraryName,
+                    target_version: targetVersion
+                }]
             })
         });
         
         if (response.ok) {
-            showConfigStatus('✅ Connection successful!', 'success');
+            const results = await response.json();
+            displayProjectUpdateResultsInProject(projectId, results);
         } else {
-            const error = await response.text();
-            showConfigStatus(`❌ Connection failed: ${error}`, 'error');
+            const errorData = await response.json();
+            showError(`Failed to update library: ${errorData.message || errorData}`);
         }
     } catch (error) {
-        showConfigStatus(`❌ Connection failed: ${error.message}`, 'error');
+        showError(`Failed to update library: ${error.message}`);
+    } finally {
+        showLoading(false);
     }
 }
 
-function showConfigStatus(message, type) {
-    const statusElement = document.getElementById('config-status');
-    statusElement.textContent = message;
-    statusElement.className = `config-status ${type}`;
+function displayProjectUpdateResultsInProject(projectId, results) {
+    const contentDiv = document.getElementById(`libraries-content-${projectId}`);
     
-    // Clear status after 5 seconds
-    setTimeout(() => {
-        statusElement.textContent = '';
-        statusElement.className = '';
-    }, 5000);
+    let html = `
+        <div style="margin-bottom: 15px;">
+            <strong>Update Results:</strong>
+        </div>
+    `;
+    
+    results.results.forEach((result, index) => {
+        const statusColor = result.success ? '#d4edda' : '#f8d7da';
+        const textColor = result.success ? '#155724' : '#721c24';
+        const icon = result.success ? '✅' : '❌';
+        
+        html += `
+            <div style="border: 1px solid ${statusColor}; border-radius: 4px; padding: 10px; margin-bottom: 8px; background: ${statusColor};">
+                <div style="color: ${textColor}; font-weight: bold;">${icon} ${result.message || result.error}</div>
+        `;
+        
+        if (result.success && result.merge_request) {
+            html += `
+                <div style="margin-top: 8px;">
+                    <strong>Merge Request:</strong>
+                    <a href="${result.merge_request.web_url}" target="_blank" style="color: #007bff;">
+                        ${result.merge_request.title} (#${result.merge_request.iid})
+                    </a>
+                </div>
+            `;
+        }
+        
+        if (result.changes && result.changes.files_changed) {
+            html += `
+                <div style="margin-top: 8px;">
+                    <strong>Files Changed:</strong> ${result.changes.files_changed.join(', ')}
+            </div>
+        `;
+        }
+        
+        html += `</div>`;
+    });
+    
+    contentDiv.innerHTML = html;
 }
 
+function closeProjectLibraries(projectId) {
+    const librariesDiv = document.getElementById(`libraries-${projectId}`);
+    librariesDiv.style.display = 'none';
+}
+
+async function checkOutdatedLibrariesForProject(projectId, projectName) {
+    const token = document.getElementById('gitlab-token').value;
+    
+    if (!token.trim()) {
+        showError('Please configure your GitLab API token first');
+        return;
+    }
+    
+    showLoading(true, `Checking for outdated libraries in ${projectName}...`);
+
+    try {
+        const response = await fetch(`${API_BASE}/library/outdated/${projectId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            displayOutdatedLibrariesForProject(projectId, projectName, data);
+                } else {
+            const errorData = await response.json();
+            showError(`Failed to check outdated libraries: ${errorData.message || errorData}`);
+            }
+        } catch (error) {
+        showError(`Failed to check outdated libraries: ${error.message}`);
+        } finally {
+            showLoading(false);
+    }
+}
+
+function displayOutdatedLibrariesForProject(projectId, projectName, data) {
+    if (data.updates && data.updates.length > 0) {
+        let message = `Found ${data.count} outdated libraries in ${projectName}:\n\n`;
+        data.updates.forEach(update => {
+            message += `• ${update.library_name}: ${update.current_version} → ${update.latest_version}\n`;
+        });
+        message += `\nClick "📦 Manage Libraries" to update them.`;
+        alert(message);
+    } else {
+        alert(`No outdated libraries found in ${projectName}. All libraries are up to date!`);
+    }
+}
+
+// Initialize Mermaid
+mermaid.initialize({ 
+    startOnLoad: true,
+    theme: 'default',
+    flowchart: {
+        useMaxWidth: true,
+    },
+    securityLevel: 'loose',
+});
+
+// Initial URL display update
 // Cache management functions
 async function loadInitialCache() {
     const token = document.getElementById('gitlab-token').value;
     if (!token.trim()) {
-        showCacheStatus('Please configure your GitLab API token first', 'error');
+        showError('Please configure your GitLab API token first');
         return;
     }
 
-    showCacheStatus('Loading initial cache...', 'warning');
-    showLoadingOverlay(true, 'Loading Initial Cache', 'Fetching all projects from GitLab and analyzing Go modules...');
+    showLoading(true, 'Loading initial cache...');
 
     try {
         const response = await fetch(`${API_BASE}/cache/load`, {
@@ -961,52 +1518,32 @@ async function loadInitialCache() {
                 'Content-Type': 'application/json'
             }
         });
-        
+
         if (response.ok) {
-            const result = await response.json();
-            showCacheStatus(`✅ Initial cache loaded: ${result.projects_cached} projects with detailed information cached`, 'success');
-            await loadCacheStats();
-        } else {
+            const data = await response.json();
+            showSuccess(`Cache loaded successfully! ${data.count || 0} projects cached.`);
+    } else {
             const errorData = await response.json();
-            if (errorData.error === 'Cache service unavailable') {
-                showCacheStatus(`⚠️ ${errorData.message}`, 'warning');
-            } else {
-                showCacheStatus(`❌ Failed to load initial cache: ${errorData.message || errorData}`, 'error');
-            }
+            showError(`Failed to load cache: ${errorData.message || 'Unknown error'}`);
         }
     } catch (error) {
-        showCacheStatus(`❌ Failed to load initial cache: ${error.message}`, 'error');
+        showError(`Failed to load cache: ${error.message}`);
     } finally {
-        showLoadingOverlay(false);
+        showLoading(false);
     }
 }
 
 async function refreshCache() {
     const token = document.getElementById('gitlab-token').value;
     if (!token.trim()) {
-        showCacheStatus('Please configure your GitLab API token first', 'error');
+        showError('Please configure your GitLab API token first');
         return;
     }
     
-    showCacheStatus('Refreshing cache...', 'warning');
-    showLoadingOverlay(true, 'Refreshing Cache', 'Updating cached data from GitLab...');
+    showLoading(true, 'Refreshing cache...');
     
     try {
-        // First clear the cache to force fresh data
-        const clearResponse = await fetch(`${API_BASE}/cache/clear`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        if (!clearResponse.ok) {
-            console.warn('Failed to clear cache, continuing with refresh...');
-        }
-        
-        // Then load fresh cache
-        const response = await fetch(`${API_BASE}/cache/load`, {
+        const response = await fetch(`${API_BASE}/cache/refresh`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -1015,37 +1552,31 @@ async function refreshCache() {
         });
         
         if (response.ok) {
-            const result = await response.json();
-            showCacheStatus(`✅ Cache refreshed successfully: ${result.projects_cached || 'Unknown'} projects cached`, 'success');
-            await loadCacheStats();
+        const data = await response.json();
+            showSuccess(`Cache refreshed successfully! ${data.count || 0} projects updated.`);
         } else {
             const errorData = await response.json();
-            if (errorData.error === 'Cache service unavailable') {
-                showCacheStatus(`⚠️ ${errorData.message}`, 'warning');
-            } else {
-                showCacheStatus(`❌ Failed to refresh cache: ${errorData.message || errorData}`, 'error');
-            }
+            showError(`Failed to refresh cache: ${errorData.message || 'Unknown error'}`);
         }
     } catch (error) {
-        showCacheStatus(`❌ Failed to refresh cache: ${error.message}`, 'error');
+        showError(`Failed to refresh cache: ${error.message}`);
     } finally {
-        showLoadingOverlay(false);
+        showLoading(false);
     }
 }
 
 async function clearCache() {
     const token = document.getElementById('gitlab-token').value;
     if (!token.trim()) {
-        showCacheStatus('Please configure your GitLab API token first', 'error');
+        showError('Please configure your GitLab API token first');
         return;
     }
     
-    if (!confirm('Are you sure you want to clear all cached data? This action cannot be undone.')) {
-        return;
-    }
-    
-    showCacheStatus('Clearing cache...', 'warning');
-    showLoadingOverlay(true, 'Clearing Cache', 'Removing all cached data...');
+    if (!confirm('Are you sure you want to clear the cache? This will remove all cached project data.')) {
+            return;
+        }
+        
+    showLoading(true, 'Clearing cache...');
     
     try {
         const response = await fetch(`${API_BASE}/cache/clear`, {
@@ -1057,1144 +1588,235 @@ async function clearCache() {
         });
         
         if (response.ok) {
-            showCacheStatus('✅ Cache cleared successfully', 'success');
-            await loadCacheStats();
-        } else {
+            showSuccess('Cache cleared successfully!');
+                } else {
             const errorData = await response.json();
-            if (errorData.error === 'Cache service unavailable') {
-                showCacheStatus(`⚠️ ${errorData.message}`, 'warning');
-            } else {
-                showCacheStatus(`❌ Failed to clear cache: ${errorData.message || errorData}`, 'error');
+            showError(`Failed to clear cache: ${errorData.message || 'Unknown error'}`);
             }
-        }
-    } catch (error) {
-        showCacheStatus(`❌ Failed to clear cache: ${error.message}`, 'error');
-    } finally {
-        showLoadingOverlay(false);
+        } catch (error) {
+        showError(`Failed to clear cache: ${error.message}`);
+        } finally {
+            showLoading(false);
     }
 }
 
-async function loadCacheStats() {
+async function refreshProjectCache() {
     const token = document.getElementById('gitlab-token').value;
+    const projectId = document.getElementById('webhook-project-id').value;
+    
     if (!token.trim()) {
+        showError('Please configure your GitLab API token first');
         return;
     }
     
+    if (!projectId.trim()) {
+        showError('Please enter a project ID');
+        return;
+    }
+    
+    showLoading(true, `Refreshing project ${projectId} cache...`);
+    
     try {
-        const response = await fetch(`${API_BASE}/cache/stats`, {
+        const response = await fetch(`${API_BASE}/cache/refresh-project?project_id=${projectId}`, {
+            method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
             }
         });
         
         if (response.ok) {
-            const stats = await response.json();
-            displayCacheStats(stats);
+            const data = await response.json();
+            showSuccess(`Project ${projectId} cache refreshed successfully!`);
+    } else {
+            const errorData = await response.json();
+            showError(`Failed to refresh project cache: ${errorData.message || 'Unknown error'}`);
         }
     } catch (error) {
-        console.log('Failed to load cache stats:', error);
+        showError(`Failed to refresh project cache: ${error.message}`);
+    } finally {
+                    showLoading(false);
     }
 }
 
-function displayCacheStats(stats) {
-    const statsDiv = document.getElementById('cache-stats');
-    const totalCached = document.getElementById('total-cached');
-    const cacheType = document.getElementById('cache-type');
-    const searchHashes = document.getElementById('search-hashes');
-    
-    if (stats) {
-        totalCached.textContent = stats.total_cached_projects || 0;
-        cacheType.textContent = stats.cache_type || 'Hash-Based';
-        searchHashes.textContent = stats.search_hashes ? stats.search_hashes.length : 0;
-        statsDiv.style.display = 'block';
-    }
-}
-
-function showCacheStatus(message, type) {
-    const statusElement = document.getElementById('cache-status');
-    statusElement.textContent = message;
-    statusElement.className = `cache-status ${type}`;
-
-    // Clear status after 5 seconds
-    setTimeout(() => {
-        statusElement.textContent = '';
-        statusElement.className = '';
-    }, 5000);
-}
-
-// Check for changed projects
 async function checkChangedProjects() {
     const token = document.getElementById('gitlab-token').value;
-    
     if (!token.trim()) {
-        showCacheStatus('Please configure your GitLab API token first', 'error');
-        return;
-    }
-
-    showCacheStatus('Checking for changed projects...', 'warning');
-    showLoadingOverlay(true, 'Checking Changed Projects', 'Comparing current projects with cached data...');
-
+        showError('Please configure your GitLab API token first');
+                    return;
+                }
+                
+    showLoading(true, 'Checking for changed projects...');
+    
     try {
-        const response = await fetch(`${API_BASE}/projects/changed`, {
+        const response = await fetch(`${API_BASE}/cache/stats`, {
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
             }
         });
-
+        
         if (response.ok) {
             const data = await response.json();
-            if (data.count > 0) {
-                showCacheStatus(`✅ Found ${data.count} changed projects`, 'success');
-                // Display changed projects
-                displayChangedProjects(data.projects);
-            } else {
-                showCacheStatus('✅ No projects have changed since last cache build', 'success');
-            }
-        } else {
+            showSuccess(`Found ${data.changed_projects || 0} changed projects. Cache status: ${data.status || 'Unknown'}`);
+                } else {
             const errorData = await response.json();
-            if (errorData.error === 'Cache service unavailable') {
-                showCacheStatus(`⚠️ ${errorData.message}`, 'warning');
-            } else {
-                showCacheStatus(`❌ Failed to check changed projects: ${errorData.message || errorData}`, 'error');
-            }
+            showError(`Failed to check changed projects: ${errorData.message || 'Unknown error'}`);
         }
     } catch (error) {
-        showCacheStatus(`❌ Failed to check changed projects: ${error.message}`, 'error');
+        showError(`Failed to check changed projects: ${error.message}`);
     } finally {
-        showLoadingOverlay(false);
+        showLoading(false);
     }
 }
 
-// Display changed projects
-function displayChangedProjects(projects) {
-    const resultsDiv = document.getElementById('project-results');
-    const statsDiv = document.getElementById('search-stats');
-    const projectsDiv = document.getElementById('projects-list');
-    
-    statsDiv.innerHTML = `Found ${projects.length} project(s) that have changed since last cache build`;
-    statsDiv.style.display = 'block';
-    
-    if (projects.length > 0) {
-        projectsDiv.innerHTML = projects.map(project => `
-            <div class="project-item">
-                <div class="project-info">
-                    <div class="project-name">${project.name} <span style="color: #e74c3c; font-size: 12px;">(CHANGED)</span></div>
-                    <div class="project-path">${project.path_with_namespace}</div>
-                    ${project.web_url ? `
-                        <div class="project-url">
-                            <a href="${project.web_url}" target="_blank" rel="noopener noreferrer">
-                                🔗 ${project.web_url}
-                            </a>
-                        </div>
-                    ` : ''}
-                    <div class="project-details">
-                        ${project.go_version ? `
-                            <div class="detail-item">
-                                <div class="detail-label">Go Version</div>
-                                <div class="detail-value">${project.go_version}</div>
-                            </div>
-                        ` : ''}
-                        ${project.libraries && project.libraries.length > 0 ? `
-                            <div class="detail-item">
-                                <div class="detail-label">Libraries (${project.libraries.length})</div>
-                                <div class="libraries-list">
-                                    ${project.libraries.map(lib => `
-                                        <div class="library-item">
-                                            <span class="library-name">${lib.name}</span>
-                                            <span class="library-version">${lib.version}</span>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>
-                        ` : ''}
-                    </div>
-                </div>
-            </div>
-        `).join('');
-    } else {
-        projectsDiv.innerHTML = '<div class="no-results">No changed projects found.</div>';
-    }
-    
-    resultsDiv.style.display = 'block';
-}
-
-// Webhook function to refresh specific project cache
-async function refreshProjectCache() {
-    const projectId = document.getElementById('webhook-project-id').value;
+async function testGitLabConnection() {
     const token = document.getElementById('gitlab-token').value;
-    
-    if (!projectId.trim()) {
-        showCacheStatus('Please enter a project ID', 'error');
-        return;
-    }
-    
     if (!token.trim()) {
-        showCacheStatus('Please configure your GitLab API token first', 'error');
+        showError('Please enter your GitLab API token first');
         return;
     }
-
-    showCacheStatus('Refreshing project cache...', 'warning');
-    showLoadingOverlay(true, 'Refreshing Project Cache', `Updating cache for project ${projectId}...`);
-
+    
+    showLoading(true, 'Testing GitLab connection...');
+    
     try {
-        const response = await fetch(`${API_BASE}/cache/refresh-project`, {
+        const response = await fetch(`${API_BASE}/config/test`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                project_id: parseInt(projectId),
                 token: token
             })
         });
-
+        
         if (response.ok) {
-            showCacheStatus(`✅ Project ${projectId} cache refreshed successfully`, 'success');
-            await loadCacheStats();
+            const data = await response.json();
+            showSuccess(`✅ GitLab connection successful! User: ${data.user || 'Unknown'}, Projects accessible: ${data.projects_count || 0}`);
         } else {
             const errorData = await response.json();
-            if (errorData.error === 'Cache service unavailable') {
-                showCacheStatus(`⚠️ ${errorData.message}`, 'warning');
-            } else {
-                showCacheStatus(`❌ Failed to refresh project cache: ${errorData.message || errorData}`, 'error');
-            }
+            showError(`❌ GitLab connection failed: ${errorData.message || 'Invalid token or network error'}`);
         }
     } catch (error) {
-        showCacheStatus(`❌ Failed to refresh project cache: ${error.message}`, 'error');
-    } finally {
-        showLoadingOverlay(false);
-    }
-}
-
-// Update URL display based on current configuration
-function updateUrlDisplay() {
-    const group = document.getElementById('gitlab-group').value || 'nghis';
-    const tag = document.getElementById('gitlab-tag').value || 'services';
-    const branch = document.getElementById('gitlab-branch').value || 'default';
-    
-    // Update API endpoint
-    document.getElementById('api-endpoint').value = `/api/v4/groups/${group}/projects`;
-    
-    // Update full URL
-    const fullUrl = `https://gitlab.com/api/v4/groups/${group}/projects?with_issues_enabled=true&with_merge_requests_enabled=true&order_by=last_activity_at&sort=desc&per_page=100`;
-    document.getElementById('full-url').value = fullUrl;
-    
-    console.log('🔗 GitLab API URL updated:', fullUrl);
-    showConfigStatus('URL display updated', 'success');
-}
-
-// Initialize Mermaid
-mermaid.initialize({ 
-    startOnLoad: true,
-    theme: 'default',
-    flowchart: {
-        useMaxWidth: true,
-        htmlLabels: true
-    }
-});
-
-// OpenAPI Documentation Functions
-let allOpenAPIProjects = []; // Store all projects for search
-let filteredOpenAPIProjects = []; // Store filtered projects
-
-async function loadProjectsWithOpenAPI() {
-    try {
-        showLoading(true, 'Loading projects with OpenAPI specifications...');
-        
-        // Use the new search endpoint to get projects with OpenAPI
-        const response = await fetch(`${API_BASE}/projects/search-openapi?has_openapi=true&limit=100`);
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data.projects && data.projects.length > 0) {
-            allOpenAPIProjects = data.projects;
-            filteredOpenAPIProjects = [...allOpenAPIProjects];
-            displayProjectsWithOpenAPI(filteredOpenAPIProjects);
-            // Show the side-by-side layout
-            document.getElementById('openapi-layout').style.display = 'flex';
-        } else {
-            showError('No projects with OpenAPI specifications found. Make sure to load cache first.');
-        }
-    } catch (error) {
-        console.error('Error loading projects with OpenAPI:', error);
-        showError(`Failed to load projects with OpenAPI: ${error.message}`);
+        showError(`❌ GitLab connection failed: ${error.message}`);
     } finally {
         showLoading(false);
     }
 }
 
-async function loadAllProjectsForOpenAPI() {
-    try {
-        showLoading(true, 'Loading all projects...');
-        
-        // Use the new search endpoint to get all projects
-        const response = await fetch(`${API_BASE}/projects/search-openapi?limit=200`);
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data.projects && data.projects.length > 0) {
-            allOpenAPIProjects = data.projects;
-            filteredOpenAPIProjects = [...allOpenAPIProjects];
-            displayProjectsWithOpenAPI(filteredOpenAPIProjects);
-            // Show the side-by-side layout
-            document.getElementById('openapi-layout').style.display = 'flex';
-        } else {
-            showError('No projects found. Make sure to load cache first.');
-        }
-    } catch (error) {
-        console.error('Error loading all projects:', error);
-        showError(`Failed to load projects: ${error.message}`);
-    } finally {
-        showLoading(false);
-    }
-}
-
-function displayProjectsWithOpenAPI(projects) {
-    const list = document.getElementById('openapi-projects-list');
-    const searchResults = document.getElementById('openapi-search-results');
+// Quick search/filter functions
+function filterProjects() {
+    const searchTerm = document.getElementById('quick-search').value.toLowerCase().trim();
+    const allProjectItems = document.querySelectorAll('.project-item');
+    const filterCountDiv = document.getElementById('filter-count');
     
-    list.innerHTML = '';
-    
-    // Check if projects is valid
-    if (!projects || !Array.isArray(projects) || projects.length === 0) {
-        searchResults.style.display = 'block';
+    if (!searchTerm) {
+        // Show all projects
+        allProjectItems.forEach(item => {
+            item.style.display = 'block';
+        });
+        filterCountDiv.textContent = '';
         return;
     }
     
-    searchResults.style.display = 'none';
+    let visibleCount = 0;
+    let totalCount = allProjectItems.length;
     
-    projects.forEach(project => {
-        // Validate project object
-        if (!project || !project.id || !project.name) {
-            console.warn('Invalid project object:', project);
-            return;
-        }
+    allProjectItems.forEach(item => {
+        const projectTitle = item.querySelector('.project-title');
+        const projectPath = item.querySelector('.project-link');
         
-        const projectDiv = document.createElement('div');
-        projectDiv.className = 'project-item';
-        projectDiv.onclick = () => selectProject(project.id, project.name, projectDiv);
-        
-        // Check if project has OpenAPI
-        const hasOpenAPI = project.openapi && project.openapi.found;
-        const openAPIInfo = hasOpenAPI 
-            ? `📋 ${project.openapi.path} (${project.openapi.content_length || 0} chars)`
-            : '❌ No OpenAPI specification found';
-        
-        projectDiv.innerHTML = `
-            <h4>${project.name || 'Unknown Project'}</h4>
-            <p>${project.path || 'No path'}</p>
-            <div class="openapi-info ${hasOpenAPI ? '' : 'no-openapi'}">
-                ${openAPIInfo}
-            </div>
-        `;
-        
-        list.appendChild(projectDiv);
-    });
-}
-
-// Debounce timer for search
-let searchTimeout = null;
-
-async function searchOpenAPIProjects() {
-    const searchTerm = document.getElementById('openapi-search').value || 
-                      document.getElementById('openapi-panel-search').value;
-    const filterValue = document.getElementById('openapi-filter').value || 
-                       document.getElementById('openapi-panel-filter').value;
-    
-    // Clear previous timeout
-    if (searchTimeout) {
-        clearTimeout(searchTimeout);
-    }
-    
-    // If no search term and showing all, use cached results
-    if (!searchTerm && filterValue === 'all' && allOpenAPIProjects.length > 0) {
-        filteredOpenAPIProjects = [...allOpenAPIProjects];
-        displayProjectsWithOpenAPI(filteredOpenAPIProjects);
-        return;
-    }
-    
-    // Add visual feedback for search
-    const searchInput = document.getElementById('openapi-search') || document.getElementById('openapi-panel-search');
-    if (searchInput) {
-        searchInput.classList.add('searching');
-    }
-    
-    // Debounce the search to avoid too many API calls
-    searchTimeout = setTimeout(async () => {
-        try {
-            // Show loading only for actual API calls
-            if (searchTerm || (filterValue !== 'all' && filterValue !== '')) {
-                showLoading(true, 'Searching projects...');
-            }
+        if (projectTitle && projectPath) {
+            const titleText = projectTitle.textContent.toLowerCase();
+            const pathText = projectPath.textContent.toLowerCase();
             
-            // Build search URL
-            const searchParams = new URLSearchParams();
-            if (searchTerm) searchParams.append('q', searchTerm);
-            if (filterValue === 'has-openapi') searchParams.append('has_openapi', 'true');
-            if (filterValue === 'no-openapi') searchParams.append('has_openapi', 'false');
-            searchParams.append('limit', '100');
-            
-            const response = await fetch(`${API_BASE}/projects/search-openapi?${searchParams.toString()}`);
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            
-            const data = await response.json();
-            
-            // Debug logging
-            console.log('Search API response:', data);
-            
-            // Validate response structure
-            if (!data) {
-                throw new Error('Invalid response from server');
-            }
-            
-            if (data.projects && Array.isArray(data.projects) && data.projects.length > 0) {
-                filteredOpenAPIProjects = data.projects;
-                
-                // Show dropdown results if there's a search term
-                if (searchTerm) {
-                    displaySearchDropdown(data.projects);
-                } else {
-                    displayProjectsWithOpenAPI(filteredOpenAPIProjects);
-                }
+            if (titleText.includes(searchTerm) || pathText.includes(searchTerm)) {
+                item.style.display = 'block';
+                visibleCount++;
             } else {
-                // Show no results message
-                if (searchTerm) {
-                    displaySearchDropdown([]);
-                } else {
-                    const list = document.getElementById('openapi-projects-list');
-                    const searchResults = document.getElementById('openapi-search-results');
-                    
-                    list.innerHTML = '';
-                    searchResults.style.display = 'block';
-                    searchResults.querySelector('.search-info').textContent = 
-                        `No projects found matching "${searchTerm || 'your criteria'}"`;
-                }
-            }
-        } catch (error) {
-            console.error('Error searching projects:', error);
-            showError(`Failed to search projects: ${error.message}`);
-            
-            // Fallback: show cached results if available
-            if (allOpenAPIProjects.length > 0) {
-                console.log('Falling back to cached results');
-                filteredOpenAPIProjects = [...allOpenAPIProjects];
-                displayProjectsWithOpenAPI(filteredOpenAPIProjects);
-            }
-        } finally {
-            showLoading(false);
-            // Remove searching visual feedback
-            const searchInput = document.getElementById('openapi-search') || document.getElementById('openapi-panel-search');
-            if (searchInput) {
-                searchInput.classList.remove('searching');
+                item.style.display = 'none';
             }
         }
-    }, 300); // 300ms debounce delay
-}
-
-function filterOpenAPIProjects() {
-    searchOpenAPIProjects(); // Reuse search logic
-}
-
-function displaySearchDropdown(projects) {
-    const dropdown = document.getElementById('openapi-search-dropdown');
-    const resultsContainer = document.getElementById('openapi-search-results-dropdown');
-    
-    if (!dropdown || !resultsContainer) return;
-    
-    resultsContainer.innerHTML = '';
-    
-    if (projects.length === 0) {
-        resultsContainer.innerHTML = '<div class="search-dropdown-item" style="text-align: center; color: #6c757d; font-style: italic;">No projects found</div>';
-        dropdown.style.display = 'block';
-        return;
-    }
-    
-    // Limit to 10 results for dropdown
-    const limitedProjects = projects.slice(0, 10);
-    
-    limitedProjects.forEach(project => {
-        const item = document.createElement('div');
-        item.className = 'search-dropdown-item';
-        
-        const hasOpenAPI = project.openapi && project.openapi.found;
-        const openAPIBadge = hasOpenAPI 
-            ? '<span class="openapi-badge has-openapi">Has OpenAPI</span>'
-            : '<span class="openapi-badge no-openapi">No OpenAPI</span>';
-        
-        item.innerHTML = `
-            <div>
-                <h5>${project.name || 'Unknown Project'}</h5>
-                <p class="project-path">${project.path || 'No path'}</p>
-            </div>
-            <div>
-                ${openAPIBadge}
-            </div>
-        `;
-        
-        item.onclick = () => {
-            selectProjectFromDropdown(project);
-        };
-        
-        resultsContainer.appendChild(item);
     });
     
-    dropdown.style.display = 'block';
-}
-
-function selectProjectFromDropdown(project) {
-    // Hide dropdown
-    const dropdown = document.getElementById('openapi-search-dropdown');
-    if (dropdown) {
-        dropdown.style.display = 'none';
-    }
-    
-    // Set search input to selected project
-    const searchInput = document.getElementById('openapi-search');
-    if (searchInput) {
-        searchInput.value = project.name;
-    }
-    
-    // Load the project's OpenAPI if it has one
-    if (project.openapi && project.openapi.found) {
-        viewProjectOpenAPI(project.id, project.name);
+    // Update filter count
+    if (visibleCount === totalCount) {
+        filterCountDiv.textContent = '';
     } else {
-        // Show message that project doesn't have OpenAPI
-        const viewer = document.getElementById('openapi-viewer');
-        const placeholder = document.getElementById('openapi-placeholder');
-        
-        if (viewer) viewer.style.display = 'none';
-        if (placeholder) {
-            placeholder.style.display = 'block';
-            const placeholderContent = placeholder.querySelector('.placeholder-content');
-            if (placeholderContent) {
-                placeholderContent.innerHTML = `
-                    <h3>❌ No OpenAPI Specification</h3>
-                    <p>This project doesn't have an OpenAPI specification</p>
-                `;
-            }
-        }
+        filterCountDiv.textContent = `Showing ${visibleCount} of ${totalCount} projects`;
     }
 }
 
-function showSearchResults() {
-    const searchTerm = document.getElementById('openapi-search').value;
-    if (searchTerm && searchTerm.length > 0) {
-        const dropdown = document.getElementById('openapi-search-dropdown');
-        if (dropdown) {
-            dropdown.style.display = 'block';
-        }
-    }
-}
-
-function hideSearchResults() {
-    // Delay hiding to allow clicking on dropdown items
-    setTimeout(() => {
-        const dropdown = document.getElementById('openapi-search-dropdown');
-        if (dropdown) {
-            dropdown.style.display = 'none';
-        }
-    }, 200);
-}
-
-// cURL Parser Functions
-function parseCurlAndFindProject() {
-    const curlInput = document.getElementById('curl-input').value.trim();
-    const resultDiv = document.getElementById('curl-result');
-    const resultContent = document.getElementById('curl-result-content');
-    
-    if (!curlInput) {
-        showCurlResult('Please paste a cURL command', 'error');
-        return;
-    }
-    
-    try {
-        const parsedUrl = parseCurlCommand(curlInput);
-        if (!parsedUrl) {
-            showCurlResult('Could not extract URL from cURL command', 'error');
-            return;
-        }
-        
-        showCurlResult(`Extracted URL: ${parsedUrl}`, 'info');
-        console.log('Parsed URL:', parsedUrl);
-        findProjectByUrl(parsedUrl);
-        
-    } catch (error) {
-        console.error('Error parsing cURL:', error);
-        showCurlResult(`Error parsing cURL: ${error.message}`, 'error');
-    }
-}
-
-function parseCurlCommand(curlCommand) {
-    // Remove line breaks and normalize spaces
-    const normalized = curlCommand.replace(/\s+/g, ' ').trim();
-    
-    // Extract URL using regex patterns
-    const urlPatterns = [
-        // Standard cURL with URL
-        /curl\s+['"]?([^'"\s]+)['"]?/i,
-        // cURL with -X and URL
-        /curl\s+-X\s+\w+\s+['"]?([^'"\s]+)['"]?/i,
-        // cURL with multiple options and URL
-        /curl\s+[^'"\s]*['"]?([^'"\s]+)['"]?/i,
-        // Look for http:// or https:// URLs
-        /(https?:\/\/[^\s'"]+)/i
-    ];
-    
-    for (const pattern of urlPatterns) {
-        const match = normalized.match(pattern);
-        if (match && match[1]) {
-            let url = match[1];
-            // Clean up the URL
-            url = url.replace(/['"]/g, '');
-            // Remove trailing parameters that might be part of the command
-            url = url.split(' ')[0];
-            return url;
-        }
-    }
-    
-    return null;
-}
-
-function findProjectByUrl(url) {
-    showLoading(true, 'Searching for project...');
-    
-    // Extract domain/path information from URL
-    const urlObj = new URL(url);
-    const hostname = urlObj.hostname;
-    const pathname = urlObj.pathname;
-    
-    // Extract the actual endpoint (last part of the path)
-    const pathParts = pathname.split('/').filter(part => part.length > 0);
-    const actualEndpoint = pathParts[pathParts.length - 1]; // Last part like "base-reg"
-    const endpointPath = `/${actualEndpoint}`; // Just the endpoint like "/base-reg"
-    
-    // Create search terms from the actual endpoint
-    const searchTerms = [
-        actualEndpoint,  // Just "base-reg"
-        endpointPath,   // "/base-reg"
-        actualEndpoint.replace(/-/g, ' '), // "base reg"
-        actualEndpoint.replace(/-/g, '_'), // "base_reg"
-    ].filter(term => term && term.length > 0);
-    
-    console.log('Searching for project with actual endpoint:', actualEndpoint);
-    console.log('Search terms:', searchTerms);
-    
-    // Try multiple search strategies - focus on actual endpoint
-    const searchStrategies = [
-        // Strategy 1: Actual endpoint with quotes for exact matching
-        `"${actualEndpoint}"`,
-        // Strategy 2: Actual endpoint
-        actualEndpoint,
-        // Strategy 3: Endpoint path
-        endpointPath,
-        // Strategy 4: Endpoint with spaces
-        actualEndpoint.replace(/-/g, ' '),
-        // Strategy 5: Endpoint with underscores
-        actualEndpoint.replace(/-/g, '_')
-    ].filter(term => term && term.length > 0);
-    
-    // Try each search strategy
-    trySearchStrategy(searchStrategies, 0, url);
-}
-
-function scoreAndSortResults(projects, searchQuery) {
-    const searchLower = searchQuery.toLowerCase().replace(/"/g, ''); // Remove quotes for comparison
-    
-    return projects.map(project => {
-        let score = 0;
-        const projectName = (project.name || '').toLowerCase();
-        const projectPath = (project.path || '').toLowerCase();
-        
-        // Check if project has OpenAPI content to search in
-        const hasOpenAPIContent = project.openapi && project.openapi.content_length > 0;
-        
-        // Highest score: Project name matches endpoint path
-        if (projectName === searchLower) {
-            score += 10000;
-        }
-        
-        // High score: Project name contains endpoint path
-        else if (projectName.includes(searchLower)) {
-            score += 5000;
-        }
-        
-        // Medium score: Project path contains endpoint path
-        else if (projectPath.includes(searchLower)) {
-            score += 3000;
-        }
-        
-        // Check if OpenAPI content contains the endpoint path
-        if (hasOpenAPIContent) {
-            // This would require fetching the OpenAPI content, but for now we'll assume
-            // projects with OpenAPI that match the name/path are relevant
-            score += 1000;
-        }
-        
-        // Lower score for partial matches
-        else {
-            score += 100;
-        }
-        
-        return {
-            ...project,
-            relevanceScore: score
-        };
-    })
-    .filter(project => project.relevanceScore > 0) // Only keep projects with some relevance
-    .sort((a, b) => b.relevanceScore - a.relevanceScore)
-    .slice(0, 3); // Only return top 3 results
-}
-
-function trySearchStrategy(searchStrategies, index, originalUrl) {
-    if (index >= searchStrategies.length) {
-        showLoading(false);
-        showCurlResult('No projects found matching the URL. Try searching manually.', 'warning');
-        return;
-    }
-    
-    const searchQuery = searchStrategies[index];
-    console.log(`Trying search strategy ${index + 1}: "${searchQuery}"`);
-    
-    // Use the existing search API with OpenAPI filter
-    const searchParams = new URLSearchParams({
-        query: searchQuery,
-        hasOpenAPI: 'true',  // Only search for projects with OpenAPI
-        limit: 10  // Get more results to filter properly
-    });
-    
-    fetch(`${API_BASE}/projects/search-openapi?${searchParams.toString()}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log(`Search strategy ${index + 1} results:`, data);
-            if (data.projects && data.projects.length > 0) {
-                // Score and sort results by relevance
-                const scoredResults = scoreAndSortResults(data.projects, searchQuery);
-                console.log('Scored results:', scoredResults);
-                
-                // Check if we have a perfect match (exact name match)
-                const perfectMatch = scoredResults.find(p => p.relevanceScore >= 10000);
-                if (perfectMatch) {
-                    console.log('Found perfect match, stopping search');
-                    showLoading(false);
-                    displayCurlResults([perfectMatch], originalUrl);
-                    return;
-                }
-                
-                // Found results, show them
-                showLoading(false);
-                displayCurlResults(scoredResults, originalUrl);
-            } else {
-                // No results with this strategy, try the next one
-                trySearchStrategy(searchStrategies, index + 1, originalUrl);
-            }
-        })
-        .catch(error => {
-            console.error(`Error with search strategy ${index + 1}:`, error);
-            // Try next strategy on error
-            trySearchStrategy(searchStrategies, index + 1, originalUrl);
-        });
-}
-
-function displayCurlResults(projects, originalUrl) {
-    const resultDiv = document.getElementById('curl-result');
-    const resultContent = document.getElementById('curl-result-content');
-    
-    let html = `
-        <div style="margin-bottom: 10px;">
-            <strong>Found ${projects.length} matching project(s) with OpenAPI:</strong>
-        </div>
-    `;
-    
-    projects.forEach((project, index) => {
-        const hasOpenAPI = project.openapi && project.openapi.found;
-        const openAPIBadge = hasOpenAPI 
-            ? '<span style="background: #d4edda; color: #155724; padding: 2px 6px; border-radius: 3px; font-size: 10px;">Has OpenAPI</span>'
-            : '<span style="background: #f8d7da; color: #721c24; padding: 2px 6px; border-radius: 3px; font-size: 10px;">No OpenAPI</span>';
-        
-        // Show relevance score for debugging
-        const relevanceInfo = project.relevanceScore ? 
-            `<div style="color: #6c757d; font-size: 10px; margin-top: 2px;">Relevance: ${project.relevanceScore}</div>` : '';
-        
-        html += `
-            <div style="border: 1px solid #ddd; border-radius: 4px; padding: 10px; margin-bottom: 8px; cursor: pointer; background: white;" 
-                 onclick="selectProjectFromCurl(${project.id}, '${project.name}', ${hasOpenAPI})">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <strong>${project.name || 'Unknown Project'}</strong>
-                        <div style="color: #6c757d; font-size: 12px; margin-top: 2px;">${project.path || 'No path'}</div>
-                        ${relevanceInfo}
-                    </div>
-                    <div>
-                        ${openAPIBadge}
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-    
-    resultContent.innerHTML = html;
-    resultDiv.style.display = 'block';
-}
-
-function selectProjectFromCurl(projectId, projectName, hasOpenAPI) {
-    // Clear cURL input
-    document.getElementById('curl-input').value = '';
-    
-    // Hide cURL results
-    document.getElementById('curl-result').style.display = 'none';
-    
-    // Set search input to selected project
-    const searchInput = document.getElementById('openapi-search');
+function clearQuickSearch() {
+    const searchInput = document.getElementById('quick-search');
     if (searchInput) {
-        searchInput.value = projectName;
+        searchInput.value = '';
+        filterProjects(); // Reset the filter
+    }
+}
+
+// Library search/filter functions
+function filterLibraries(projectId) {
+    const searchTerm = document.getElementById(`library-search-${projectId}`).value.toLowerCase().trim();
+    const librariesTable = document.getElementById(`libraries-table-${projectId}`);
+    const librarySummary = document.getElementById(`library-summary-${projectId}`);
+    
+    if (!librariesTable) return;
+    
+    const allLibraryRows = librariesTable.querySelectorAll('.library-row');
+    
+    if (!searchTerm) {
+        // Show all libraries
+        allLibraryRows.forEach(row => {
+            row.style.display = 'grid';
+        });
+        if (librarySummary) {
+            librarySummary.textContent = `Showing ${allLibraryRows.length} ${allLibraryRows.length === 1 ? 'library' : 'libraries'} • Scroll to see all`;
+        }
+        return;
     }
     
-    // Always try to load the OpenAPI, regardless of what the search said
-    // This will verify if the OpenAPI actually exists
-    console.log(`Attempting to load OpenAPI for project ${projectId} (${projectName})`);
-    viewProjectOpenAPI(projectId, projectName);
-}
-
-function showCurlResult(message, type) {
-    const resultDiv = document.getElementById('curl-result');
-    const resultContent = document.getElementById('curl-result-content');
+    let visibleCount = 0;
+    const totalCount = allLibraryRows.length;
     
-    const colors = {
-        'info': '#17a2b8',
-        'success': '#28a745',
-        'warning': '#ffc107',
-        'error': '#dc3545'
-    };
-    
-    resultContent.innerHTML = `
-        <div style="color: ${colors[type] || colors.info}; font-weight: 500;">
-            ${message}
-        </div>
-    `;
-    resultDiv.style.display = 'block';
-}
-
-function selectProject(projectId, projectName, element) {
-    // Remove active class from all project items
-    document.querySelectorAll('.project-item').forEach(item => {
-        item.classList.remove('active');
+    allLibraryRows.forEach(row => {
+        const libraryName = row.dataset.libraryName || '';
+        
+        if (libraryName.toLowerCase().includes(searchTerm)) {
+            row.style.display = 'grid';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
     });
     
-    // Add active class to selected item
-    element.classList.add('active');
-    
-    // Load and display the OpenAPI spec
-    viewProjectOpenAPI(projectId, projectName);
-}
-
-async function viewProjectOpenAPI(projectId, projectName) {
-    try {
-        showLoading(true, `Loading OpenAPI documentation for ${projectName}...`);
-        
-        const response = await fetch(`${API_BASE}/projects/${projectId}/openapi`);
-        if (!response.ok) {
-            if (response.status === 404) {
-                throw new Error('OpenAPI specification not found for this project');
-            }
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    // Update summary
+    if (librarySummary) {
+        if (visibleCount === totalCount) {
+            librarySummary.textContent = `Showing ${totalCount} ${totalCount === 1 ? 'library' : 'libraries'} • Scroll to see all`;
+        } else {
+            librarySummary.textContent = `Showing ${visibleCount} of ${totalCount} ${totalCount === 1 ? 'library' : 'libraries'}`;
         }
-        
-        const openAPIContent = await response.text();
-        
-        // Hide placeholder and show viewer
-        const placeholder = document.getElementById('openapi-placeholder');
-        const viewer = document.getElementById('openapi-viewer');
-        
-        if (placeholder) placeholder.style.display = 'none';
-        if (viewer) viewer.style.display = 'block';
-        
-        displayOpenAPIDocumentation(projectName, openAPIContent);
-    } catch (error) {
-        console.error('Error loading OpenAPI documentation:', error);
-        
-        // Show specific error message in the placeholder
-        const placeholder = document.getElementById('openapi-placeholder');
-        const viewer = document.getElementById('openapi-viewer');
-        
-        if (viewer) viewer.style.display = 'none';
-        if (placeholder) {
-            placeholder.style.display = 'block';
-            const placeholderContent = placeholder.querySelector('.placeholder-content');
-            if (placeholderContent) {
-                if (error.message.includes('not found')) {
-                    placeholderContent.innerHTML = `
-                        <h3>❌ No OpenAPI Specification</h3>
-                        <p>This project doesn't have an OpenAPI specification</p>
-                        <p style="color: #6c757d; font-size: 12px; margin-top: 10px;">
-                            The search indicated this project has OpenAPI, but it's not available. 
-                            This might be due to cache inconsistency.
-                        </p>
-                    `;
-                } else {
-                    placeholderContent.innerHTML = `
-                        <h3>⚠️ Error Loading OpenAPI</h3>
-                        <p>Failed to load OpenAPI specification: ${error.message}</p>
-                    `;
-                }
-            }
-        }
-        
-        showError(`Failed to load OpenAPI documentation: ${error.message}`);
-    } finally {
-        showLoading(false);
     }
 }
 
-function displayOpenAPIDocumentation(projectName, openAPIContent) {
-    const container = document.getElementById('openapi-viewer');
-    const content = document.getElementById('openapi-content');
-    const placeholder = document.getElementById('openapi-placeholder');
-    const title = document.getElementById('openapi-viewer-title');
-    
-    // Hide placeholder and show viewer
-    if (placeholder) placeholder.style.display = 'none';
-    if (container) container.style.display = 'block';
-    
-    // Update title
-    if (title) {
-        title.textContent = `${projectName} - OpenAPI Documentation`;
-    }
-    
-    // Store the content for copying/downloading
-    window.currentOpenAPIContent = openAPIContent;
-    window.currentProjectName = projectName;
-    
-    // Clear previous content
-    content.innerHTML = '';
-    
-    try {
-        // Parse YAML to JSON for Swagger UI
-        const openAPISpec = jsyaml.load(openAPIContent);
-        
-        // Ensure the spec has the required structure for Swagger UI
-        if (!openAPISpec.openapi && !openAPISpec.swagger) {
-            console.warn('OpenAPI spec missing version, adding default');
-            openAPISpec.openapi = '3.0.0';
-        }
-        
-        // Ensure we have paths for Swagger UI to work with
-        if (!openAPISpec.paths || Object.keys(openAPISpec.paths).length === 0) {
-            console.warn('No paths found in OpenAPI spec, adding example');
-            openAPISpec.paths = {
-                '/test': {
-                    get: {
-                        summary: 'Test endpoint',
-                        description: 'A simple test endpoint',
-                        responses: {
-                            '200': {
-                                description: 'Successful response',
-                                content: {
-                                    'application/json': {
-                                        schema: {
-                                            type: 'object',
-                                            properties: {
-                                                message: {
-                                                    type: 'string',
-                                                    example: 'Hello World'
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            };
-        }
-        
-        // Initialize Swagger UI
-        const ui = SwaggerUIBundle({
-            spec: openAPISpec,
-            dom_id: '#openapi-content',
-            deepLinking: true,
-            presets: [
-                SwaggerUIBundle.presets.apis,
-                SwaggerUIStandalonePreset
-            ],
-            plugins: [
-                SwaggerUIBundle.plugins.DownloadUrl
-            ],
-            layout: "StandaloneLayout",
-            tryItOutEnabled: true,
-            supportedSubmitMethods: ['get', 'post', 'put', 'delete', 'patch', 'head', 'options'],
-            validatorUrl: null, // Disable validator to avoid CORS issues
-            docExpansion: 'list', // Show all endpoints by default
-            defaultModelsExpandDepth: 1,
-            defaultModelExpandDepth: 1,
-            requestInterceptor: function(request) {
-                console.log('Making request:', request);
-                // Add CORS headers if needed
-                request.headers = request.headers || {};
-                request.headers['Access-Control-Allow-Origin'] = '*';
-                return request;
-            },
-            responseInterceptor: function(response) {
-                console.log('Received response:', response);
-                return response;
-            },
-            onComplete: function() {
-                console.log('Swagger UI loaded successfully');
-                // Debug: Check if try buttons exist
-                setTimeout(() => {
-                    const tryButtons = document.querySelectorAll('.try-out__btn');
-                    const executeButtons = document.querySelectorAll('.btn.execute');
-                    console.log('Found try buttons:', tryButtons.length);
-                    console.log('Found execute buttons:', executeButtons.length);
-                    
-                    // Log all buttons for debugging
-                    const allButtons = document.querySelectorAll('button');
-                    console.log('All buttons found:', allButtons.length);
-                    allButtons.forEach((btn, index) => {
-                        if (btn.textContent.toLowerCase().includes('try') || btn.textContent.toLowerCase().includes('execute')) {
-                            console.log(`Button ${index}:`, btn.textContent, btn.className);
-                        }
-                    });
-                }, 2000);
-            },
-            onFailure: function(error) {
-                console.error('Swagger UI failed to load:', error);
-                // Fallback to raw YAML display
-                displayRawOpenAPI(openAPIContent);
-            }
-        });
-    } catch (error) {
-        console.error('Failed to parse OpenAPI YAML:', error);
-        // Fallback to raw YAML display
-        displayRawOpenAPI(openAPIContent);
+function clearLibrarySearch(projectId) {
+    const searchInput = document.getElementById(`library-search-${projectId}`);
+    if (searchInput) {
+        searchInput.value = '';
+        filterLibraries(projectId); // Reset the filter
     }
 }
 
-function displayRawOpenAPI(openAPIContent) {
-    const content = document.getElementById('openapi-content');
-    content.innerHTML = `
-        <div style="padding: 20px;">
-            <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 15px; margin: 10px 0;">
-                <pre style="margin: 0; white-space: pre-wrap; word-wrap: break-word; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.4; color: #2c3e50;">${escapeHtml(openAPIContent)}</pre>
-            </div>
-        </div>
-    `;
-}
-
-function clearOpenAPIView() {
-    // Clear content
-    document.getElementById('openapi-content').innerHTML = '';
+document.addEventListener('DOMContentLoaded', () => {
+    updateUrlDisplay();
     
-    // Show placeholder and hide viewer
-    document.getElementById('openapi-placeholder').style.display = 'block';
-    document.getElementById('openapi-viewer').style.display = 'none';
+    // Add event listeners for configuration changes
+    const groupInput = document.getElementById('gitlab-group');
+    const tagInput = document.getElementById('gitlab-tag');
+    const branchInput = document.getElementById('gitlab-branch');
     
-    // Reset search state
-    allOpenAPIProjects = [];
-    filteredOpenAPIProjects = [];
-    document.getElementById('openapi-search').value = '';
-    document.getElementById('openapi-filter').value = 'all';
-    
-    // Hide dropdown
-    const dropdown = document.getElementById('openapi-search-dropdown');
-    if (dropdown) {
-        dropdown.style.display = 'none';
-    }
-}
-
-function copyOpenAPIToClipboard() {
-    if (window.currentOpenAPIContent) {
-        navigator.clipboard.writeText(window.currentOpenAPIContent).then(() => {
-            showError('OpenAPI content copied to clipboard!');
-        }).catch(err => {
-            console.error('Failed to copy to clipboard:', err);
-            showError('Failed to copy to clipboard');
-        });
-    }
-}
-
-function downloadOpenAPI() {
-    if (window.currentOpenAPIContent && window.currentProjectName) {
-        const blob = new Blob([window.currentOpenAPIContent], { type: 'application/yaml' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${window.currentProjectName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_openapi.yaml`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-function debugSwaggerUI() {
-    console.log('=== Swagger UI Debug Info ===');
-    
-    // Check if Swagger UI is loaded
-    const swaggerContainer = document.getElementById('openapi-content');
-    console.log('Swagger container:', swaggerContainer);
-    console.log('Container HTML:', swaggerContainer.innerHTML.substring(0, 200) + '...');
-    
-    // Check for try buttons
-    const tryButtons = document.querySelectorAll('.try-out__btn');
-    console.log('Try buttons found:', tryButtons.length);
-    tryButtons.forEach((btn, index) => {
-        console.log(`Try button ${index}:`, {
-            text: btn.textContent,
-            className: btn.className,
-            visible: btn.offsetParent !== null,
-            disabled: btn.disabled
-        });
-    });
-    
-    // Check for execute buttons
-    const executeButtons = document.querySelectorAll('.btn.execute');
-    console.log('Execute buttons found:', executeButtons.length);
-    
-    // Check for operation blocks
-    const opBlocks = document.querySelectorAll('.opblock');
-    console.log('Operation blocks found:', opBlocks.length);
-    
-    // Check for any buttons with "try" or "execute" in text
-    const allButtons = document.querySelectorAll('button');
-    const relevantButtons = Array.from(allButtons).filter(btn => 
-        btn.textContent.toLowerCase().includes('try') || 
-        btn.textContent.toLowerCase().includes('execute')
-    );
-    console.log('Relevant buttons:', relevantButtons.length);
-    relevantButtons.forEach((btn, index) => {
-        console.log(`Button ${index}:`, {
-            text: btn.textContent.trim(),
-            className: btn.className,
-            visible: btn.offsetParent !== null,
-            disabled: btn.disabled
-        });
-    });
-    
-    // Check if Swagger UI global is available
-    console.log('SwaggerUIBundle available:', typeof SwaggerUIBundle !== 'undefined');
-    console.log('SwaggerUIStandalonePreset available:', typeof SwaggerUIStandalonePreset !== 'undefined');
-    
-    // Show debug info in alert
-    alert(`Debug Info:\nTry buttons: ${tryButtons.length}\nExecute buttons: ${executeButtons.length}\nOperation blocks: ${opBlocks.length}\nCheck console for details.`);
-}
-    
+    if (groupInput) groupInput.addEventListener('change', updateUrlDisplay);
+    if (tagInput) tagInput.addEventListener('change', updateUrlDisplay);
+    if (branchInput) branchInput.addEventListener('change', updateUrlDisplay);
+});

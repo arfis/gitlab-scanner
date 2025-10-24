@@ -5,16 +5,17 @@ import "time"
 
 // Project represents a GitLab project
 type Project struct {
-	ID          int       `json:"id"`
-	Name        string    `json:"name"`
-	Path        string    `json:"path_with_namespace"`
-	WebURL      string    `json:"web_url,omitempty"`
-	Description string    `json:"description,omitempty"`
-	CreatedAt   time.Time `json:"created_at,omitempty"`
-	UpdatedAt   time.Time `json:"updated_at,omitempty"`
-	GoVersion   string    `json:"go_version,omitempty"`
-	Libraries   []Library `json:"libraries,omitempty"`
-	OpenAPI     *OpenAPI  `json:"openapi,omitempty"`
+	ID            int       `json:"id"`
+	Name          string    `json:"name"`
+	Path          string    `json:"path_with_namespace"`
+	WebURL        string    `json:"web_url,omitempty"`
+	Description   string    `json:"description,omitempty"`
+	DefaultBranch string    `json:"default_branch,omitempty"`
+	CreatedAt     time.Time `json:"created_at,omitempty"`
+	UpdatedAt     time.Time `json:"updated_at,omitempty"`
+	GoVersion     string    `json:"go_version,omitempty"`
+	Libraries     []Library `json:"libraries,omitempty"`
+	OpenAPI       *OpenAPI  `json:"openapi,omitempty"`
 }
 
 // Library represents a Go module dependency

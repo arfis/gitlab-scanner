@@ -684,7 +684,8 @@ func (s *ProjectService) matchesDetailedCriteria(project domain.Project, criteri
 	if criteria.Library != "" {
 		found := false
 		for _, lib := range project.Libraries {
-			if strings.Contains(lib.Name, criteria.Library) {
+			// Use exact match for library name
+			if lib.Name == criteria.Library {
 				if criteria.Version == "" {
 					found = true
 					break
