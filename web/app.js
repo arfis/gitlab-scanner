@@ -23,6 +23,14 @@ window.addEventListener('load', async function() {
         
         // Load cache stats
         loadCacheStats();
+        
+        // Update URL display
+        updateUrlDisplay();
+        
+        // Add event listeners for URL updates
+        document.getElementById('gitlab-group').addEventListener('input', updateUrlDisplay);
+        document.getElementById('gitlab-tag').addEventListener('input', updateUrlDisplay);
+        document.getElementById('gitlab-branch').addEventListener('change', updateUrlDisplay);
     } catch (error) {
         console.error('❌ Cannot connect to API server:', error);
         showError('Cannot connect to API server. Please make sure the server is running.');
@@ -984,7 +992,21 @@ async function refreshCache() {
     showLoadingOverlay(true, 'Refreshing Cache', 'Updating cached data from GitLab...');
     
     try {
-        const response = await fetch(`${API_BASE}/cache/refresh`, {
+        // First clear the cache to force fresh data
+        const clearResponse = await fetch(`${API_BASE}/cache/clear`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!clearResponse.ok) {
+            console.warn('Failed to clear cache, continuing with refresh...');
+        }
+        
+        // Then load fresh cache
+        const response = await fetch(`${API_BASE}/cache/load`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -993,7 +1015,8 @@ async function refreshCache() {
         });
         
         if (response.ok) {
-            showCacheStatus('✅ Cache refreshed successfully', 'success');
+            const result = await response.json();
+            showCacheStatus(`✅ Cache refreshed successfully: ${result.projects_cached || 'Unknown'} projects cached`, 'success');
             await loadCacheStats();
         } else {
             const errorData = await response.json();
@@ -1241,6 +1264,23 @@ async function refreshProjectCache() {
     } finally {
         showLoadingOverlay(false);
     }
+}
+
+// Update URL display based on current configuration
+function updateUrlDisplay() {
+    const group = document.getElementById('gitlab-group').value || 'nghis';
+    const tag = document.getElementById('gitlab-tag').value || 'services';
+    const branch = document.getElementById('gitlab-branch').value || 'default';
+    
+    // Update API endpoint
+    document.getElementById('api-endpoint').value = `/api/v4/groups/${group}/projects`;
+    
+    // Update full URL
+    const fullUrl = `https://gitlab.com/api/v4/groups/${group}/projects?with_issues_enabled=true&with_merge_requests_enabled=true&order_by=last_activity_at&sort=desc&per_page=100`;
+    document.getElementById('full-url').value = fullUrl;
+    
+    console.log('🔗 GitLab API URL updated:', fullUrl);
+    showConfigStatus('URL display updated', 'success');
 }
 
 // Initialize Mermaid

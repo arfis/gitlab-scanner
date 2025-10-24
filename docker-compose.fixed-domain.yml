@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  # Main application
+  gitlab-list:
+    build: .
+    ports:
+      - "8080:8080"  # Expose backend directly on port 8080
+    environment:
+      - GITLAB_TOKEN=${GITLAB_TOKEN}
+      - GROUP=${GROUP:-nghis}
+      - TAG=${TAG:-services}
+      - PORT=8080
+      - BRANCHES=${BRANCHES:-default}
+      - MONGODB_URI=${MONGODB_URI:-mongodb://host.docker.internal:27017}
+      - MONGODB_USERNAME=${MONGODB_USERNAME}
+      - MONGODB_PASSWORD=${MONGODB_PASSWORD}
+      - MONGODB_DATABASE=${MONGODB_DATABASE:-gitlab_cache}
+      - CACHE_TTL=${CACHE_TTL:-24h}
+      - SYNC_SCHEDULE=${SYNC_SCHEDULE:-0 3 * * *}
+      - TZ=${TZ:-UTC}
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - gitlab-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Scheduler service for automatic synchronization
+  scheduler:
+    build: .
+    command: ["./scheduler"]
+    environment:
+      - GITLAB_TOKEN=${GITLAB_TOKEN}
+      - GROUP=${GROUP:-nghis}
+      - TAG=${TAG:-services}
+      - BRANCHES=${BRANCHES:-default}
+      - MONGODB_URI=${MONGODB_URI:-mongodb://host.docker.internal:27017}
+      - MONGODB_USERNAME=${MONGODB_USERNAME}
+      - MONGODB_PASSWORD=${MONGODB_PASSWORD}
+      - MONGODB_DATABASE=${MONGODB_DATABASE:-gitlab_cache}
+      - SYNC_SCHEDULE=${SYNC_SCHEDULE:-0 3 * * *}
+      - TZ=${TZ:-UTC}
+    depends_on:
+      - gitlab-list
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - gitlab-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+networks:
+  gitlab-network:
+    driver: bridge

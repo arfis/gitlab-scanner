@@ -1,0 +1,45 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+readme.md
+
+# Build artifacts
+bin/
+main
+scheduler
+*.exe
+
+# IDE files
+*.iml
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Environment files (will be passed via docker-compose)
+.env
+
+# Development files
+.air.toml
+scripts/
+
+# Architecture files
+*.json
+*.mmd
+
+# Node modules (if any)
+node_modules/
+package-lock.json
+
+# Test files
+*_test.go
+test/

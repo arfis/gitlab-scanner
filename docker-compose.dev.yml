@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  # MongoDB for development
+  mongodb:
+    image: mongo:7.0
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=admin
+      - MONGO_INITDB_DATABASE=gitlab_cache
+    volumes:
+      - mongodb_dev_data:/data/db
+    restart: unless-stopped
+    networks:
+      - gitlab-dev-network
+
+volumes:
+  mongodb_dev_data:
+
+networks:
+  gitlab-dev-network:
+    driver: bridge

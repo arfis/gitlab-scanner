@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # Main application - using port 9090 to avoid development conflicts
+  gitlab-list:
+    build: .
+    ports:
+      - "9090:8080"  # External port 9090, internal port 8080
+    environment:
+      - GITLAB_TOKEN=${GITLAB_TOKEN}
+      - GROUP=${GROUP:-nghis}
+      - TAG=${TAG:-services}
+      - PORT=8080  # Internal port
+      - BRANCHES=${BRANCHES:-default}
+      - MONGODB_URI=${MONGODB_URI:-mongodb://host.docker.internal:27017}
+      - MONGODB_USERNAME=${MONGODB_USERNAME}
+      - MONGODB_PASSWORD=${MONGODB_PASSWORD}
+      - MONGODB_DATABASE=${MONGODB_DATABASE:-gitlab_cache}
+      - CACHE_TTL=${CACHE_TTL:-24h}
+      - SYNC_SCHEDULE=${SYNC_SCHEDULE:-0 3 * * *}
+      - TZ=${TZ:-UTC}
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - gitlab-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Nginx reverse proxy for clean URLs (no port needed)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"  # Clean URL on port 80
+    volumes:
+      - ./nginx-dev-tool.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - gitlab-list
+    networks:
+      - gitlab-network
+    restart: unless-stopped
+
+  # Scheduler service for automatic synchronization
+  scheduler:
+    build: .
+    command: ["./scheduler"]
+    environment:
+      - GITLAB_TOKEN=${GITLAB_TOKEN}
+      - GROUP=${GROUP:-nghis}
+      - TAG=${TAG:-services}
+      - BRANCHES=${BRANCHES:-default}
+      - MONGODB_URI=${MONGODB_URI:-mongodb://host.docker.internal:27017}
+      - MONGODB_USERNAME=${MONGODB_USERNAME}
+      - MONGODB_PASSWORD=${MONGODB_PASSWORD}
+      - MONGODB_DATABASE=${MONGODB_DATABASE:-gitlab_cache}
+      - SYNC_SCHEDULE=${SYNC_SCHEDULE:-0 3 * * *}
+      - TZ=${TZ:-UTC}
+    depends_on:
+      - gitlab-list
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - gitlab-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+networks:
+  gitlab-network:
+    driver: bridge

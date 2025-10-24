@@ -18,6 +18,8 @@ type Configuration struct {
 	MongoDBPassword string   `env:"MONGODB_PASSWORD"`
 	MongoDBDatabase string   `env:"MONGODB_DATABASE" env-default:"gitlab_cache"`
 	CacheTTL        string   `env:"CACHE_TTL" env-default:"24h"`
+	SyncSchedule    string   `env:"SYNC_SCHEDULE" env-default:"0 3 * * *"`
+	Timezone        string   `env:"TZ" env-default:"UTC"`
 }
 
 func NewConfiguration() (*Configuration, error) {

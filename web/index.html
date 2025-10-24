@@ -47,6 +47,33 @@
                 <span id="config-status" style="margin-left: 10px; font-size: 14px;"></span>
             </div>
 
+            <!-- GitLab URL Information -->
+            <div class="section">
+                <h3>🔗 GitLab URL Information</h3>
+                <div class="form-row">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="gitlab-url">GitLab Base URL:</label>
+                        <input type="text" id="gitlab-url" placeholder="https://gitlab.com" value="https://gitlab.com" readonly>
+                        <small style="color: #7f8c8d; font-size: 12px;">Base URL for GitLab API calls</small>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label for="api-endpoint">API Endpoint:</label>
+                        <input type="text" id="api-endpoint" placeholder="/api/v4/groups/{group}/projects" readonly>
+                        <small style="color: #7f8c8d; font-size: 12px;">Current API endpoint being used</small>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="full-url">Full API URL:</label>
+                        <input type="text" id="full-url" placeholder="https://gitlab.com/api/v4/groups/nghis/projects" readonly>
+                        <small style="color: #7f8c8d; font-size: 12px;">Complete URL being parsed for projects</small>
+                    </div>
+                    <div class="form-group">
+                        <button onclick="updateUrlDisplay()">🔄 Update URL</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Cache Management Section -->
             <div class="section">
                 <h3>💾 Cache Management</h3>

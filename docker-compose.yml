@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # Main application
+  gitlab-list:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - GITLAB_TOKEN=${GITLAB_TOKEN}
+      - GROUP=${GROUP:-nghis}
+      - TAG=${TAG:-services}
+      - PORT=8080
+      - BRANCHES=${BRANCHES:-default}
+      - MONGODB_URI=mongodb://mongodb:27017
+      - MONGODB_USERNAME=${MONGODB_USERNAME:-admin}
+      - MONGODB_PASSWORD=${MONGODB_PASSWORD:-admin}
+      - MONGODB_DATABASE=${MONGODB_DATABASE:-gitlab_cache}
+      - CACHE_TTL=${CACHE_TTL:-24h}
+      - SYNC_SCHEDULE=${SYNC_SCHEDULE:-0 3 * * *}
+      - TZ=${TZ:-UTC}
+    depends_on:
+      - mongodb
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - gitlab-network
+
+  # MongoDB for caching
+  mongodb:
+    image: mongo:7.0
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGODB_USERNAME:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGODB_PASSWORD:-admin}
+      - MONGO_INITDB_DATABASE=${MONGODB_DATABASE:-gitlab_cache}
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    networks:
+      - gitlab-network
+
+  # Scheduler service for automatic synchronization
+  scheduler:
+    build: .
+    command: ["./scheduler"]
+    environment:
+      - GITLAB_TOKEN=${GITLAB_TOKEN}
+      - GROUP=${GROUP:-nghis}
+      - TAG=${TAG:-services}
+      - BRANCHES=${BRANCHES:-default}
+      - MONGODB_URI=mongodb://mongodb:27017
+      - MONGODB_USERNAME=${MONGODB_USERNAME:-admin}
+      - MONGODB_PASSWORD=${MONGODB_PASSWORD:-admin}
+      - MONGODB_DATABASE=${MONGODB_DATABASE:-gitlab_cache}
+      - SYNC_SCHEDULE=${SYNC_SCHEDULE:-0 3 * * *}
+      - TZ=${TZ:-UTC}
+    depends_on:
+      - mongodb
+      - gitlab-list
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - gitlab-network
+
+volumes:
+  mongodb_data:
+
+networks:
+  gitlab-network:
+    driver: bridge
