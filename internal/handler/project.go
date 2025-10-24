@@ -760,3 +760,258 @@ func (h *ProjectHandler) GetArchitectureFile(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Content-Type", contentType)
 	w.Write(content)
 }
+
+// GetProjectOpenAPI handles GET /api/projects/{id}/openapi
+func (h *ProjectHandler) GetProjectOpenAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract project ID from URL path
+	path := r.URL.Path
+	parts := strings.Split(path, "/")
+	if len(parts) < 4 {
+		http.Error(w, "Invalid URL path", http.StatusBadRequest)
+		return
+	}
+
+	projectIDStr := parts[3]
+	projectID, err := strconv.Atoi(projectIDStr)
+	if err != nil {
+		http.Error(w, "Invalid project ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get OpenAPI specification
+	openAPI, err := h.projectService.GetProjectOpenAPI(projectID)
+	if err != nil {
+		// Check if it's a MongoDB not available error
+		if strings.Contains(err.Error(), "MongoDB repository not available") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"error":   "Cache service unavailable",
+				"message": "MongoDB is not available. Please configure MongoDB to enable caching.",
+				"details": err.Error(),
+			})
+			return
+		}
+		http.Error(w, fmt.Sprintf("Failed to get OpenAPI specification: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	if !openAPI.Found {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error":   "OpenAPI specification not found",
+			"message": fmt.Sprintf("No OpenAPI specification found for project %d", projectID),
+		})
+		return
+	}
+
+	// Return the OpenAPI content
+	w.Header().Set("Content-Type", "application/yaml")
+	w.Write([]byte(openAPI.Content))
+}
+
+// GetProjectsWithOpenAPI handles GET /api/projects/openapi
+func (h *ProjectHandler) GetProjectsWithOpenAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get all projects with OpenAPI specifications
+	projects, err := h.projectService.GetProjectsWithOpenAPI()
+	if err != nil {
+		// Check if it's a MongoDB not available error
+		if strings.Contains(err.Error(), "MongoDB repository not available") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"error":   "Cache service unavailable",
+				"message": "MongoDB is not available. Please configure MongoDB to enable caching.",
+				"details": err.Error(),
+			})
+			return
+		}
+		http.Error(w, fmt.Sprintf("Failed to get projects with OpenAPI: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"projects": projects,
+		"count":    len(projects),
+		"message":  fmt.Sprintf("Found %d projects with OpenAPI specifications", len(projects)),
+	})
+}
+
+// SearchProjectsForOpenAPI handles GET /api/projects/search-openapi
+func (h *ProjectHandler) SearchProjectsForOpenAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get search parameters
+	query := r.URL.Query().Get("q")
+	hasOpenAPI := r.URL.Query().Get("has_openapi")
+	limitStr := r.URL.Query().Get("limit")
+
+	// Parse limit
+	limit := 50 // default limit
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 200 {
+			limit = l
+		}
+	}
+
+	// Get all cached projects
+	allProjects, err := h.projectService.GetCachedProjects("initial_load_all_projects")
+	if err != nil {
+		// Check if it's a MongoDB not available error
+		if strings.Contains(err.Error(), "MongoDB repository not available") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"error":   "Cache service unavailable",
+				"message": "MongoDB is not available. Please configure MongoDB to enable caching.",
+				"details": err.Error(),
+			})
+			return
+		}
+		http.Error(w, fmt.Sprintf("Failed to get cached projects: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Filter projects based on search criteria
+	var filteredProjects []domain.Project
+	for _, project := range allProjects {
+		// Check if project has OpenAPI
+		hasOpenAPISpec := project.OpenAPI != nil && project.OpenAPI.Found
+
+		// Apply OpenAPI filter
+		if hasOpenAPI == "true" && !hasOpenAPISpec {
+			continue
+		}
+		if hasOpenAPI == "false" && hasOpenAPISpec {
+			continue
+		}
+
+		// Apply text search
+		if query != "" {
+			queryLower := strings.ToLower(query)
+			matches := strings.Contains(strings.ToLower(project.Name), queryLower) ||
+				strings.Contains(strings.ToLower(project.Path), queryLower) ||
+				strings.Contains(strings.ToLower(project.Description), queryLower)
+
+			// Also search in OpenAPI content if available
+			if project.OpenAPI != nil && project.OpenAPI.Found {
+				matches = matches || strings.Contains(strings.ToLower(project.OpenAPI.Content), queryLower)
+			}
+
+			if !matches {
+				continue
+			}
+		}
+
+		filteredProjects = append(filteredProjects, project)
+
+		// Apply limit
+		if len(filteredProjects) >= limit {
+			break
+		}
+	}
+
+	// Prepare response with project summaries (not full OpenAPI content)
+	var projectSummaries []map[string]interface{}
+	for _, project := range filteredProjects {
+		summary := map[string]interface{}{
+			"id":          project.ID,
+			"name":        project.Name,
+			"path":        project.Path,
+			"description": project.Description,
+			"web_url":     project.WebURL,
+		}
+
+		if project.OpenAPI != nil {
+			summary["openapi"] = map[string]interface{}{
+				"found":          project.OpenAPI.Found,
+				"path":           project.OpenAPI.Path,
+				"content_length": len(project.OpenAPI.Content),
+			}
+		} else {
+			summary["openapi"] = map[string]interface{}{
+				"found":          false,
+				"path":           "",
+				"content_length": 0,
+			}
+		}
+
+		projectSummaries = append(projectSummaries, summary)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"projects":    projectSummaries,
+		"count":       len(projectSummaries),
+		"total":       len(allProjects),
+		"query":       query,
+		"has_openapi": hasOpenAPI,
+		"limit":       limit,
+	})
+}
+
+// DebugOpenAPI handles GET /api/debug/openapi - for debugging OpenAPI data in cache
+func (h *ProjectHandler) DebugOpenAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get all cached projects to check OpenAPI data
+	allProjects, err := h.projectService.GetCachedProjects("initial_load_all_projects")
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get cached projects: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	var openAPIProjects []map[string]interface{}
+	var projectsWithoutOpenAPI []map[string]interface{}
+
+	for _, project := range allProjects {
+		projectInfo := map[string]interface{}{
+			"id":   project.ID,
+			"name": project.Name,
+			"path": project.Path,
+		}
+
+		if project.OpenAPI != nil {
+			projectInfo["openapi"] = map[string]interface{}{
+				"found":          project.OpenAPI.Found,
+				"path":           project.OpenAPI.Path,
+				"content_length": len(project.OpenAPI.Content),
+			}
+			if project.OpenAPI.Found {
+				openAPIProjects = append(openAPIProjects, projectInfo)
+			} else {
+				projectsWithoutOpenAPI = append(projectsWithoutOpenAPI, projectInfo)
+			}
+		} else {
+			projectInfo["openapi"] = "nil"
+			projectsWithoutOpenAPI = append(projectsWithoutOpenAPI, projectInfo)
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"total_projects":           len(allProjects),
+		"projects_with_openapi":    len(openAPIProjects),
+		"projects_without_openapi": len(projectsWithoutOpenAPI),
+		"openapi_projects":         openAPIProjects,
+		"no_openapi_projects":      projectsWithoutOpenAPI,
+	})
+}

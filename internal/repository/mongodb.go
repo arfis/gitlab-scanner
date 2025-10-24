@@ -233,6 +233,64 @@ func (r *MongoDBRepository) GetCacheStats() (map[string]interface{}, error) {
 	return stats, nil
 }
 
+// GetProjectOpenAPI retrieves OpenAPI data for a specific project
+func (r *MongoDBRepository) GetProjectOpenAPI(projectID int) (*domain.OpenAPI, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{
+		"project.id": projectID,
+	}
+
+	var cachedProject CachedProject
+	err := r.collection.FindOne(ctx, filter).Decode(&cachedProject)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, fmt.Errorf("project %d not found in cache", projectID)
+		}
+		return nil, fmt.Errorf("failed to find project: %w", err)
+	}
+
+	if cachedProject.Project.OpenAPI == nil {
+		return &domain.OpenAPI{Found: false}, nil
+	}
+
+	return cachedProject.Project.OpenAPI, nil
+}
+
+// GetProjectsWithOpenAPI retrieves all projects that have OpenAPI specifications
+func (r *MongoDBRepository) GetProjectsWithOpenAPI() ([]domain.Project, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Filter for projects that have OpenAPI data
+	filter := bson.M{
+		"project.openapi": bson.M{
+			"$exists": true,
+			"$ne":     nil,
+		},
+		"project.openapi.found": true,
+	}
+
+	cursor, err := r.collection.Find(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find projects with OpenAPI: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var cachedProjects []CachedProject
+	if err = cursor.All(ctx, &cachedProjects); err != nil {
+		return nil, fmt.Errorf("failed to decode projects with OpenAPI: %w", err)
+	}
+
+	var projects []domain.Project
+	for _, cached := range cachedProjects {
+		projects = append(projects, cached.Project)
+	}
+
+	return projects, nil
+}
+
 // Close closes the MongoDB connection
 func (r *MongoDBRepository) Close() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

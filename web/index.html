@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GitLab Architecture Viewer</title>
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css" />
+    <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
+    <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-standalone-preset.js"></script>
+    <script src="https://unpkg.com/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
     <link rel="stylesheet" href="app.css">
 </head>
 <body>
@@ -221,6 +225,77 @@
                     <div id="architecture-content"></div>
                 </div>
             </div>
+
+            <!-- OpenAPI Documentation Section -->
+            <div class="section">
+                <h3>📋 OpenAPI Documentation</h3>
+                <p style="color: #7f8c8d; font-size: 14px; margin-bottom: 15px;">
+                    View OpenAPI specifications from your projects
+                </p>
+                <div class="form-row">
+                    <div class="form-group" style="flex: 2; position: relative;">
+                        <label for="openapi-search">Search Projects:</label>
+                        <div style="display: flex; gap: 10px; position: relative;">
+                            <div style="flex: 1; position: relative;">
+                                <input type="text" id="openapi-search" placeholder="Search by project name, path, or OpenAPI content..." style="width: 100%;" onkeyup="searchOpenAPIProjects()" onfocus="showSearchResults()" onblur="hideSearchResults()">
+                                <div id="openapi-search-dropdown" class="search-dropdown" style="display: none;">
+                                    <div id="openapi-search-results-dropdown"></div>
+                                </div>
+                            </div>
+                            <button onclick="searchOpenAPIProjects()" style="padding: 8px 16px;">Search</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="openapi-filter">Filter by:</label>
+                        <select id="openapi-filter" onchange="filterOpenAPIProjects()">
+                            <option value="all">All Projects</option>
+                            <option value="has-openapi">Has OpenAPI</option>
+                            <option value="no-openapi">No OpenAPI</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button onclick="loadProjectsWithOpenAPI()">Load Projects with OpenAPI</button>
+                    <button onclick="loadAllProjectsForOpenAPI()">Load All Projects</button>
+                    <button onclick="clearOpenAPIView()">Clear View</button>
+                </div>
+                
+                <!-- cURL Parser Section -->
+                <div class="curl-section" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
+                    <h4 style="margin: 0 0 10px 0; color: #2c3e50;">🔗 Find Project from cURL</h4>
+                    <p style="margin: 0 0 10px 0; color: #6c757d; font-size: 14px;">
+                        Paste a cURL command to automatically find and open the corresponding project's OpenAPI
+                    </p>
+                    <div style="display: flex; gap: 10px; align-items: flex-start;">
+                        <textarea id="curl-input" placeholder="Paste your cURL command here..." style="flex: 1; min-height: 60px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 12px; resize: vertical;"></textarea>
+                        <button onclick="parseCurlAndFindProject()" class="btn btn-primary" style="padding: 8px 16px; white-space: nowrap;">Find Project</button>
+                    </div>
+                    <div id="curl-result" style="margin-top: 10px; display: none;">
+                        <div id="curl-result-content"></div>
+                    </div>
+                </div>
+                
+                <!-- OpenAPI Viewer - appears under search when project is selected -->
+                <div id="openapi-viewer" class="openapi-viewer" style="display: none; margin-top: 20px;">
+                    <div class="openapi-viewer-header">
+                        <h3 id="openapi-viewer-title">OpenAPI Documentation</h3>
+                        <div class="openapi-viewer-actions">
+                            <button onclick="copyOpenAPIToClipboard()" class="btn btn-secondary">Copy</button>
+                            <button onclick="downloadOpenAPI()" class="btn btn-secondary">Download</button>
+                            <button onclick="debugSwaggerUI()" class="btn btn-secondary">Debug</button>
+                        </div>
+                    </div>
+                    <div id="openapi-content"></div>
+                </div>
+                
+                <!-- Placeholder when no project is selected -->
+                <div id="openapi-placeholder" class="openapi-placeholder" style="margin-top: 20px;">
+                    <div class="placeholder-content">
+                        <h3>📋 Select a Project</h3>
+                        <p>Search and select a project above to view its OpenAPI specification</p>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <div class="content">
@@ -247,6 +322,7 @@
                 <h3>Available Architecture Files</h3>
                 <div id="files"></div>
             </div>
+            
         </div>
     </div>
 

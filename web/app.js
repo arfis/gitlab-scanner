@@ -1252,4 +1252,909 @@ mermaid.initialize({
         htmlLabels: true
     }
 });
+
+// OpenAPI Documentation Functions
+let allOpenAPIProjects = []; // Store all projects for search
+let filteredOpenAPIProjects = []; // Store filtered projects
+
+async function loadProjectsWithOpenAPI() {
+    try {
+        showLoading(true, 'Loading projects with OpenAPI specifications...');
+        
+        // Use the new search endpoint to get projects with OpenAPI
+        const response = await fetch(`${API_BASE}/projects/search-openapi?has_openapi=true&limit=100`);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.projects && data.projects.length > 0) {
+            allOpenAPIProjects = data.projects;
+            filteredOpenAPIProjects = [...allOpenAPIProjects];
+            displayProjectsWithOpenAPI(filteredOpenAPIProjects);
+            // Show the side-by-side layout
+            document.getElementById('openapi-layout').style.display = 'flex';
+        } else {
+            showError('No projects with OpenAPI specifications found. Make sure to load cache first.');
+        }
+    } catch (error) {
+        console.error('Error loading projects with OpenAPI:', error);
+        showError(`Failed to load projects with OpenAPI: ${error.message}`);
+    } finally {
+        showLoading(false);
+    }
+}
+
+async function loadAllProjectsForOpenAPI() {
+    try {
+        showLoading(true, 'Loading all projects...');
+        
+        // Use the new search endpoint to get all projects
+        const response = await fetch(`${API_BASE}/projects/search-openapi?limit=200`);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.projects && data.projects.length > 0) {
+            allOpenAPIProjects = data.projects;
+            filteredOpenAPIProjects = [...allOpenAPIProjects];
+            displayProjectsWithOpenAPI(filteredOpenAPIProjects);
+            // Show the side-by-side layout
+            document.getElementById('openapi-layout').style.display = 'flex';
+        } else {
+            showError('No projects found. Make sure to load cache first.');
+        }
+    } catch (error) {
+        console.error('Error loading all projects:', error);
+        showError(`Failed to load projects: ${error.message}`);
+    } finally {
+        showLoading(false);
+    }
+}
+
+function displayProjectsWithOpenAPI(projects) {
+    const list = document.getElementById('openapi-projects-list');
+    const searchResults = document.getElementById('openapi-search-results');
+    
+    list.innerHTML = '';
+    
+    // Check if projects is valid
+    if (!projects || !Array.isArray(projects) || projects.length === 0) {
+        searchResults.style.display = 'block';
+        return;
+    }
+    
+    searchResults.style.display = 'none';
+    
+    projects.forEach(project => {
+        // Validate project object
+        if (!project || !project.id || !project.name) {
+            console.warn('Invalid project object:', project);
+            return;
+        }
+        
+        const projectDiv = document.createElement('div');
+        projectDiv.className = 'project-item';
+        projectDiv.onclick = () => selectProject(project.id, project.name, projectDiv);
+        
+        // Check if project has OpenAPI
+        const hasOpenAPI = project.openapi && project.openapi.found;
+        const openAPIInfo = hasOpenAPI 
+            ? `📋 ${project.openapi.path} (${project.openapi.content_length || 0} chars)`
+            : '❌ No OpenAPI specification found';
+        
+        projectDiv.innerHTML = `
+            <h4>${project.name || 'Unknown Project'}</h4>
+            <p>${project.path || 'No path'}</p>
+            <div class="openapi-info ${hasOpenAPI ? '' : 'no-openapi'}">
+                ${openAPIInfo}
+            </div>
+        `;
+        
+        list.appendChild(projectDiv);
+    });
+}
+
+// Debounce timer for search
+let searchTimeout = null;
+
+async function searchOpenAPIProjects() {
+    const searchTerm = document.getElementById('openapi-search').value || 
+                      document.getElementById('openapi-panel-search').value;
+    const filterValue = document.getElementById('openapi-filter').value || 
+                       document.getElementById('openapi-panel-filter').value;
+    
+    // Clear previous timeout
+    if (searchTimeout) {
+        clearTimeout(searchTimeout);
+    }
+    
+    // If no search term and showing all, use cached results
+    if (!searchTerm && filterValue === 'all' && allOpenAPIProjects.length > 0) {
+        filteredOpenAPIProjects = [...allOpenAPIProjects];
+        displayProjectsWithOpenAPI(filteredOpenAPIProjects);
+        return;
+    }
+    
+    // Add visual feedback for search
+    const searchInput = document.getElementById('openapi-search') || document.getElementById('openapi-panel-search');
+    if (searchInput) {
+        searchInput.classList.add('searching');
+    }
+    
+    // Debounce the search to avoid too many API calls
+    searchTimeout = setTimeout(async () => {
+        try {
+            // Show loading only for actual API calls
+            if (searchTerm || (filterValue !== 'all' && filterValue !== '')) {
+                showLoading(true, 'Searching projects...');
+            }
+            
+            // Build search URL
+            const searchParams = new URLSearchParams();
+            if (searchTerm) searchParams.append('q', searchTerm);
+            if (filterValue === 'has-openapi') searchParams.append('has_openapi', 'true');
+            if (filterValue === 'no-openapi') searchParams.append('has_openapi', 'false');
+            searchParams.append('limit', '100');
+            
+            const response = await fetch(`${API_BASE}/projects/search-openapi?${searchParams.toString()}`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            // Debug logging
+            console.log('Search API response:', data);
+            
+            // Validate response structure
+            if (!data) {
+                throw new Error('Invalid response from server');
+            }
+            
+            if (data.projects && Array.isArray(data.projects) && data.projects.length > 0) {
+                filteredOpenAPIProjects = data.projects;
+                
+                // Show dropdown results if there's a search term
+                if (searchTerm) {
+                    displaySearchDropdown(data.projects);
+                } else {
+                    displayProjectsWithOpenAPI(filteredOpenAPIProjects);
+                }
+            } else {
+                // Show no results message
+                if (searchTerm) {
+                    displaySearchDropdown([]);
+                } else {
+                    const list = document.getElementById('openapi-projects-list');
+                    const searchResults = document.getElementById('openapi-search-results');
+                    
+                    list.innerHTML = '';
+                    searchResults.style.display = 'block';
+                    searchResults.querySelector('.search-info').textContent = 
+                        `No projects found matching "${searchTerm || 'your criteria'}"`;
+                }
+            }
+        } catch (error) {
+            console.error('Error searching projects:', error);
+            showError(`Failed to search projects: ${error.message}`);
+            
+            // Fallback: show cached results if available
+            if (allOpenAPIProjects.length > 0) {
+                console.log('Falling back to cached results');
+                filteredOpenAPIProjects = [...allOpenAPIProjects];
+                displayProjectsWithOpenAPI(filteredOpenAPIProjects);
+            }
+        } finally {
+            showLoading(false);
+            // Remove searching visual feedback
+            const searchInput = document.getElementById('openapi-search') || document.getElementById('openapi-panel-search');
+            if (searchInput) {
+                searchInput.classList.remove('searching');
+            }
+        }
+    }, 300); // 300ms debounce delay
+}
+
+function filterOpenAPIProjects() {
+    searchOpenAPIProjects(); // Reuse search logic
+}
+
+function displaySearchDropdown(projects) {
+    const dropdown = document.getElementById('openapi-search-dropdown');
+    const resultsContainer = document.getElementById('openapi-search-results-dropdown');
+    
+    if (!dropdown || !resultsContainer) return;
+    
+    resultsContainer.innerHTML = '';
+    
+    if (projects.length === 0) {
+        resultsContainer.innerHTML = '<div class="search-dropdown-item" style="text-align: center; color: #6c757d; font-style: italic;">No projects found</div>';
+        dropdown.style.display = 'block';
+        return;
+    }
+    
+    // Limit to 10 results for dropdown
+    const limitedProjects = projects.slice(0, 10);
+    
+    limitedProjects.forEach(project => {
+        const item = document.createElement('div');
+        item.className = 'search-dropdown-item';
+        
+        const hasOpenAPI = project.openapi && project.openapi.found;
+        const openAPIBadge = hasOpenAPI 
+            ? '<span class="openapi-badge has-openapi">Has OpenAPI</span>'
+            : '<span class="openapi-badge no-openapi">No OpenAPI</span>';
+        
+        item.innerHTML = `
+            <div>
+                <h5>${project.name || 'Unknown Project'}</h5>
+                <p class="project-path">${project.path || 'No path'}</p>
+            </div>
+            <div>
+                ${openAPIBadge}
+            </div>
+        `;
+        
+        item.onclick = () => {
+            selectProjectFromDropdown(project);
+        };
+        
+        resultsContainer.appendChild(item);
+    });
+    
+    dropdown.style.display = 'block';
+}
+
+function selectProjectFromDropdown(project) {
+    // Hide dropdown
+    const dropdown = document.getElementById('openapi-search-dropdown');
+    if (dropdown) {
+        dropdown.style.display = 'none';
+    }
+    
+    // Set search input to selected project
+    const searchInput = document.getElementById('openapi-search');
+    if (searchInput) {
+        searchInput.value = project.name;
+    }
+    
+    // Load the project's OpenAPI if it has one
+    if (project.openapi && project.openapi.found) {
+        viewProjectOpenAPI(project.id, project.name);
+    } else {
+        // Show message that project doesn't have OpenAPI
+        const viewer = document.getElementById('openapi-viewer');
+        const placeholder = document.getElementById('openapi-placeholder');
+        
+        if (viewer) viewer.style.display = 'none';
+        if (placeholder) {
+            placeholder.style.display = 'block';
+            const placeholderContent = placeholder.querySelector('.placeholder-content');
+            if (placeholderContent) {
+                placeholderContent.innerHTML = `
+                    <h3>❌ No OpenAPI Specification</h3>
+                    <p>This project doesn't have an OpenAPI specification</p>
+                `;
+            }
+        }
+    }
+}
+
+function showSearchResults() {
+    const searchTerm = document.getElementById('openapi-search').value;
+    if (searchTerm && searchTerm.length > 0) {
+        const dropdown = document.getElementById('openapi-search-dropdown');
+        if (dropdown) {
+            dropdown.style.display = 'block';
+        }
+    }
+}
+
+function hideSearchResults() {
+    // Delay hiding to allow clicking on dropdown items
+    setTimeout(() => {
+        const dropdown = document.getElementById('openapi-search-dropdown');
+        if (dropdown) {
+            dropdown.style.display = 'none';
+        }
+    }, 200);
+}
+
+// cURL Parser Functions
+function parseCurlAndFindProject() {
+    const curlInput = document.getElementById('curl-input').value.trim();
+    const resultDiv = document.getElementById('curl-result');
+    const resultContent = document.getElementById('curl-result-content');
+    
+    if (!curlInput) {
+        showCurlResult('Please paste a cURL command', 'error');
+        return;
+    }
+    
+    try {
+        const parsedUrl = parseCurlCommand(curlInput);
+        if (!parsedUrl) {
+            showCurlResult('Could not extract URL from cURL command', 'error');
+            return;
+        }
+        
+        showCurlResult(`Extracted URL: ${parsedUrl}`, 'info');
+        console.log('Parsed URL:', parsedUrl);
+        findProjectByUrl(parsedUrl);
+        
+    } catch (error) {
+        console.error('Error parsing cURL:', error);
+        showCurlResult(`Error parsing cURL: ${error.message}`, 'error');
+    }
+}
+
+function parseCurlCommand(curlCommand) {
+    // Remove line breaks and normalize spaces
+    const normalized = curlCommand.replace(/\s+/g, ' ').trim();
+    
+    // Extract URL using regex patterns
+    const urlPatterns = [
+        // Standard cURL with URL
+        /curl\s+['"]?([^'"\s]+)['"]?/i,
+        // cURL with -X and URL
+        /curl\s+-X\s+\w+\s+['"]?([^'"\s]+)['"]?/i,
+        // cURL with multiple options and URL
+        /curl\s+[^'"\s]*['"]?([^'"\s]+)['"]?/i,
+        // Look for http:// or https:// URLs
+        /(https?:\/\/[^\s'"]+)/i
+    ];
+    
+    for (const pattern of urlPatterns) {
+        const match = normalized.match(pattern);
+        if (match && match[1]) {
+            let url = match[1];
+            // Clean up the URL
+            url = url.replace(/['"]/g, '');
+            // Remove trailing parameters that might be part of the command
+            url = url.split(' ')[0];
+            return url;
+        }
+    }
+    
+    return null;
+}
+
+function findProjectByUrl(url) {
+    showLoading(true, 'Searching for project...');
+    
+    // Extract domain/path information from URL
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname;
+    const pathname = urlObj.pathname;
+    
+    // Extract the actual endpoint (last part of the path)
+    const pathParts = pathname.split('/').filter(part => part.length > 0);
+    const actualEndpoint = pathParts[pathParts.length - 1]; // Last part like "base-reg"
+    const endpointPath = `/${actualEndpoint}`; // Just the endpoint like "/base-reg"
+    
+    // Create search terms from the actual endpoint
+    const searchTerms = [
+        actualEndpoint,  // Just "base-reg"
+        endpointPath,   // "/base-reg"
+        actualEndpoint.replace(/-/g, ' '), // "base reg"
+        actualEndpoint.replace(/-/g, '_'), // "base_reg"
+    ].filter(term => term && term.length > 0);
+    
+    console.log('Searching for project with actual endpoint:', actualEndpoint);
+    console.log('Search terms:', searchTerms);
+    
+    // Try multiple search strategies - focus on actual endpoint
+    const searchStrategies = [
+        // Strategy 1: Actual endpoint with quotes for exact matching
+        `"${actualEndpoint}"`,
+        // Strategy 2: Actual endpoint
+        actualEndpoint,
+        // Strategy 3: Endpoint path
+        endpointPath,
+        // Strategy 4: Endpoint with spaces
+        actualEndpoint.replace(/-/g, ' '),
+        // Strategy 5: Endpoint with underscores
+        actualEndpoint.replace(/-/g, '_')
+    ].filter(term => term && term.length > 0);
+    
+    // Try each search strategy
+    trySearchStrategy(searchStrategies, 0, url);
+}
+
+function scoreAndSortResults(projects, searchQuery) {
+    const searchLower = searchQuery.toLowerCase().replace(/"/g, ''); // Remove quotes for comparison
+    
+    return projects.map(project => {
+        let score = 0;
+        const projectName = (project.name || '').toLowerCase();
+        const projectPath = (project.path || '').toLowerCase();
+        
+        // Check if project has OpenAPI content to search in
+        const hasOpenAPIContent = project.openapi && project.openapi.content_length > 0;
+        
+        // Highest score: Project name matches endpoint path
+        if (projectName === searchLower) {
+            score += 10000;
+        }
+        
+        // High score: Project name contains endpoint path
+        else if (projectName.includes(searchLower)) {
+            score += 5000;
+        }
+        
+        // Medium score: Project path contains endpoint path
+        else if (projectPath.includes(searchLower)) {
+            score += 3000;
+        }
+        
+        // Check if OpenAPI content contains the endpoint path
+        if (hasOpenAPIContent) {
+            // This would require fetching the OpenAPI content, but for now we'll assume
+            // projects with OpenAPI that match the name/path are relevant
+            score += 1000;
+        }
+        
+        // Lower score for partial matches
+        else {
+            score += 100;
+        }
+        
+        return {
+            ...project,
+            relevanceScore: score
+        };
+    })
+    .filter(project => project.relevanceScore > 0) // Only keep projects with some relevance
+    .sort((a, b) => b.relevanceScore - a.relevanceScore)
+    .slice(0, 3); // Only return top 3 results
+}
+
+function trySearchStrategy(searchStrategies, index, originalUrl) {
+    if (index >= searchStrategies.length) {
+        showLoading(false);
+        showCurlResult('No projects found matching the URL. Try searching manually.', 'warning');
+        return;
+    }
+    
+    const searchQuery = searchStrategies[index];
+    console.log(`Trying search strategy ${index + 1}: "${searchQuery}"`);
+    
+    // Use the existing search API with OpenAPI filter
+    const searchParams = new URLSearchParams({
+        query: searchQuery,
+        hasOpenAPI: 'true',  // Only search for projects with OpenAPI
+        limit: 10  // Get more results to filter properly
+    });
+    
+    fetch(`${API_BASE}/projects/search-openapi?${searchParams.toString()}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log(`Search strategy ${index + 1} results:`, data);
+            if (data.projects && data.projects.length > 0) {
+                // Score and sort results by relevance
+                const scoredResults = scoreAndSortResults(data.projects, searchQuery);
+                console.log('Scored results:', scoredResults);
+                
+                // Check if we have a perfect match (exact name match)
+                const perfectMatch = scoredResults.find(p => p.relevanceScore >= 10000);
+                if (perfectMatch) {
+                    console.log('Found perfect match, stopping search');
+                    showLoading(false);
+                    displayCurlResults([perfectMatch], originalUrl);
+                    return;
+                }
+                
+                // Found results, show them
+                showLoading(false);
+                displayCurlResults(scoredResults, originalUrl);
+            } else {
+                // No results with this strategy, try the next one
+                trySearchStrategy(searchStrategies, index + 1, originalUrl);
+            }
+        })
+        .catch(error => {
+            console.error(`Error with search strategy ${index + 1}:`, error);
+            // Try next strategy on error
+            trySearchStrategy(searchStrategies, index + 1, originalUrl);
+        });
+}
+
+function displayCurlResults(projects, originalUrl) {
+    const resultDiv = document.getElementById('curl-result');
+    const resultContent = document.getElementById('curl-result-content');
+    
+    let html = `
+        <div style="margin-bottom: 10px;">
+            <strong>Found ${projects.length} matching project(s) with OpenAPI:</strong>
+        </div>
+    `;
+    
+    projects.forEach((project, index) => {
+        const hasOpenAPI = project.openapi && project.openapi.found;
+        const openAPIBadge = hasOpenAPI 
+            ? '<span style="background: #d4edda; color: #155724; padding: 2px 6px; border-radius: 3px; font-size: 10px;">Has OpenAPI</span>'
+            : '<span style="background: #f8d7da; color: #721c24; padding: 2px 6px; border-radius: 3px; font-size: 10px;">No OpenAPI</span>';
+        
+        // Show relevance score for debugging
+        const relevanceInfo = project.relevanceScore ? 
+            `<div style="color: #6c757d; font-size: 10px; margin-top: 2px;">Relevance: ${project.relevanceScore}</div>` : '';
+        
+        html += `
+            <div style="border: 1px solid #ddd; border-radius: 4px; padding: 10px; margin-bottom: 8px; cursor: pointer; background: white;" 
+                 onclick="selectProjectFromCurl(${project.id}, '${project.name}', ${hasOpenAPI})">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong>${project.name || 'Unknown Project'}</strong>
+                        <div style="color: #6c757d; font-size: 12px; margin-top: 2px;">${project.path || 'No path'}</div>
+                        ${relevanceInfo}
+                    </div>
+                    <div>
+                        ${openAPIBadge}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    resultContent.innerHTML = html;
+    resultDiv.style.display = 'block';
+}
+
+function selectProjectFromCurl(projectId, projectName, hasOpenAPI) {
+    // Clear cURL input
+    document.getElementById('curl-input').value = '';
+    
+    // Hide cURL results
+    document.getElementById('curl-result').style.display = 'none';
+    
+    // Set search input to selected project
+    const searchInput = document.getElementById('openapi-search');
+    if (searchInput) {
+        searchInput.value = projectName;
+    }
+    
+    // Always try to load the OpenAPI, regardless of what the search said
+    // This will verify if the OpenAPI actually exists
+    console.log(`Attempting to load OpenAPI for project ${projectId} (${projectName})`);
+    viewProjectOpenAPI(projectId, projectName);
+}
+
+function showCurlResult(message, type) {
+    const resultDiv = document.getElementById('curl-result');
+    const resultContent = document.getElementById('curl-result-content');
+    
+    const colors = {
+        'info': '#17a2b8',
+        'success': '#28a745',
+        'warning': '#ffc107',
+        'error': '#dc3545'
+    };
+    
+    resultContent.innerHTML = `
+        <div style="color: ${colors[type] || colors.info}; font-weight: 500;">
+            ${message}
+        </div>
+    `;
+    resultDiv.style.display = 'block';
+}
+
+function selectProject(projectId, projectName, element) {
+    // Remove active class from all project items
+    document.querySelectorAll('.project-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    // Add active class to selected item
+    element.classList.add('active');
+    
+    // Load and display the OpenAPI spec
+    viewProjectOpenAPI(projectId, projectName);
+}
+
+async function viewProjectOpenAPI(projectId, projectName) {
+    try {
+        showLoading(true, `Loading OpenAPI documentation for ${projectName}...`);
+        
+        const response = await fetch(`${API_BASE}/projects/${projectId}/openapi`);
+        if (!response.ok) {
+            if (response.status === 404) {
+                throw new Error('OpenAPI specification not found for this project');
+            }
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const openAPIContent = await response.text();
+        
+        // Hide placeholder and show viewer
+        const placeholder = document.getElementById('openapi-placeholder');
+        const viewer = document.getElementById('openapi-viewer');
+        
+        if (placeholder) placeholder.style.display = 'none';
+        if (viewer) viewer.style.display = 'block';
+        
+        displayOpenAPIDocumentation(projectName, openAPIContent);
+    } catch (error) {
+        console.error('Error loading OpenAPI documentation:', error);
+        
+        // Show specific error message in the placeholder
+        const placeholder = document.getElementById('openapi-placeholder');
+        const viewer = document.getElementById('openapi-viewer');
+        
+        if (viewer) viewer.style.display = 'none';
+        if (placeholder) {
+            placeholder.style.display = 'block';
+            const placeholderContent = placeholder.querySelector('.placeholder-content');
+            if (placeholderContent) {
+                if (error.message.includes('not found')) {
+                    placeholderContent.innerHTML = `
+                        <h3>❌ No OpenAPI Specification</h3>
+                        <p>This project doesn't have an OpenAPI specification</p>
+                        <p style="color: #6c757d; font-size: 12px; margin-top: 10px;">
+                            The search indicated this project has OpenAPI, but it's not available. 
+                            This might be due to cache inconsistency.
+                        </p>
+                    `;
+                } else {
+                    placeholderContent.innerHTML = `
+                        <h3>⚠️ Error Loading OpenAPI</h3>
+                        <p>Failed to load OpenAPI specification: ${error.message}</p>
+                    `;
+                }
+            }
+        }
+        
+        showError(`Failed to load OpenAPI documentation: ${error.message}`);
+    } finally {
+        showLoading(false);
+    }
+}
+
+function displayOpenAPIDocumentation(projectName, openAPIContent) {
+    const container = document.getElementById('openapi-viewer');
+    const content = document.getElementById('openapi-content');
+    const placeholder = document.getElementById('openapi-placeholder');
+    const title = document.getElementById('openapi-viewer-title');
+    
+    // Hide placeholder and show viewer
+    if (placeholder) placeholder.style.display = 'none';
+    if (container) container.style.display = 'block';
+    
+    // Update title
+    if (title) {
+        title.textContent = `${projectName} - OpenAPI Documentation`;
+    }
+    
+    // Store the content for copying/downloading
+    window.currentOpenAPIContent = openAPIContent;
+    window.currentProjectName = projectName;
+    
+    // Clear previous content
+    content.innerHTML = '';
+    
+    try {
+        // Parse YAML to JSON for Swagger UI
+        const openAPISpec = jsyaml.load(openAPIContent);
+        
+        // Ensure the spec has the required structure for Swagger UI
+        if (!openAPISpec.openapi && !openAPISpec.swagger) {
+            console.warn('OpenAPI spec missing version, adding default');
+            openAPISpec.openapi = '3.0.0';
+        }
+        
+        // Ensure we have paths for Swagger UI to work with
+        if (!openAPISpec.paths || Object.keys(openAPISpec.paths).length === 0) {
+            console.warn('No paths found in OpenAPI spec, adding example');
+            openAPISpec.paths = {
+                '/test': {
+                    get: {
+                        summary: 'Test endpoint',
+                        description: 'A simple test endpoint',
+                        responses: {
+                            '200': {
+                                description: 'Successful response',
+                                content: {
+                                    'application/json': {
+                                        schema: {
+                                            type: 'object',
+                                            properties: {
+                                                message: {
+                                                    type: 'string',
+                                                    example: 'Hello World'
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+        }
+        
+        // Initialize Swagger UI
+        const ui = SwaggerUIBundle({
+            spec: openAPISpec,
+            dom_id: '#openapi-content',
+            deepLinking: true,
+            presets: [
+                SwaggerUIBundle.presets.apis,
+                SwaggerUIStandalonePreset
+            ],
+            plugins: [
+                SwaggerUIBundle.plugins.DownloadUrl
+            ],
+            layout: "StandaloneLayout",
+            tryItOutEnabled: true,
+            supportedSubmitMethods: ['get', 'post', 'put', 'delete', 'patch', 'head', 'options'],
+            validatorUrl: null, // Disable validator to avoid CORS issues
+            docExpansion: 'list', // Show all endpoints by default
+            defaultModelsExpandDepth: 1,
+            defaultModelExpandDepth: 1,
+            requestInterceptor: function(request) {
+                console.log('Making request:', request);
+                // Add CORS headers if needed
+                request.headers = request.headers || {};
+                request.headers['Access-Control-Allow-Origin'] = '*';
+                return request;
+            },
+            responseInterceptor: function(response) {
+                console.log('Received response:', response);
+                return response;
+            },
+            onComplete: function() {
+                console.log('Swagger UI loaded successfully');
+                // Debug: Check if try buttons exist
+                setTimeout(() => {
+                    const tryButtons = document.querySelectorAll('.try-out__btn');
+                    const executeButtons = document.querySelectorAll('.btn.execute');
+                    console.log('Found try buttons:', tryButtons.length);
+                    console.log('Found execute buttons:', executeButtons.length);
+                    
+                    // Log all buttons for debugging
+                    const allButtons = document.querySelectorAll('button');
+                    console.log('All buttons found:', allButtons.length);
+                    allButtons.forEach((btn, index) => {
+                        if (btn.textContent.toLowerCase().includes('try') || btn.textContent.toLowerCase().includes('execute')) {
+                            console.log(`Button ${index}:`, btn.textContent, btn.className);
+                        }
+                    });
+                }, 2000);
+            },
+            onFailure: function(error) {
+                console.error('Swagger UI failed to load:', error);
+                // Fallback to raw YAML display
+                displayRawOpenAPI(openAPIContent);
+            }
+        });
+    } catch (error) {
+        console.error('Failed to parse OpenAPI YAML:', error);
+        // Fallback to raw YAML display
+        displayRawOpenAPI(openAPIContent);
+    }
+}
+
+function displayRawOpenAPI(openAPIContent) {
+    const content = document.getElementById('openapi-content');
+    content.innerHTML = `
+        <div style="padding: 20px;">
+            <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 15px; margin: 10px 0;">
+                <pre style="margin: 0; white-space: pre-wrap; word-wrap: break-word; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.4; color: #2c3e50;">${escapeHtml(openAPIContent)}</pre>
+            </div>
+        </div>
+    `;
+}
+
+function clearOpenAPIView() {
+    // Clear content
+    document.getElementById('openapi-content').innerHTML = '';
+    
+    // Show placeholder and hide viewer
+    document.getElementById('openapi-placeholder').style.display = 'block';
+    document.getElementById('openapi-viewer').style.display = 'none';
+    
+    // Reset search state
+    allOpenAPIProjects = [];
+    filteredOpenAPIProjects = [];
+    document.getElementById('openapi-search').value = '';
+    document.getElementById('openapi-filter').value = 'all';
+    
+    // Hide dropdown
+    const dropdown = document.getElementById('openapi-search-dropdown');
+    if (dropdown) {
+        dropdown.style.display = 'none';
+    }
+}
+
+function copyOpenAPIToClipboard() {
+    if (window.currentOpenAPIContent) {
+        navigator.clipboard.writeText(window.currentOpenAPIContent).then(() => {
+            showError('OpenAPI content copied to clipboard!');
+        }).catch(err => {
+            console.error('Failed to copy to clipboard:', err);
+            showError('Failed to copy to clipboard');
+        });
+    }
+}
+
+function downloadOpenAPI() {
+    if (window.currentOpenAPIContent && window.currentProjectName) {
+        const blob = new Blob([window.currentOpenAPIContent], { type: 'application/yaml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${window.currentProjectName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_openapi.yaml`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function debugSwaggerUI() {
+    console.log('=== Swagger UI Debug Info ===');
+    
+    // Check if Swagger UI is loaded
+    const swaggerContainer = document.getElementById('openapi-content');
+    console.log('Swagger container:', swaggerContainer);
+    console.log('Container HTML:', swaggerContainer.innerHTML.substring(0, 200) + '...');
+    
+    // Check for try buttons
+    const tryButtons = document.querySelectorAll('.try-out__btn');
+    console.log('Try buttons found:', tryButtons.length);
+    tryButtons.forEach((btn, index) => {
+        console.log(`Try button ${index}:`, {
+            text: btn.textContent,
+            className: btn.className,
+            visible: btn.offsetParent !== null,
+            disabled: btn.disabled
+        });
+    });
+    
+    // Check for execute buttons
+    const executeButtons = document.querySelectorAll('.btn.execute');
+    console.log('Execute buttons found:', executeButtons.length);
+    
+    // Check for operation blocks
+    const opBlocks = document.querySelectorAll('.opblock');
+    console.log('Operation blocks found:', opBlocks.length);
+    
+    // Check for any buttons with "try" or "execute" in text
+    const allButtons = document.querySelectorAll('button');
+    const relevantButtons = Array.from(allButtons).filter(btn => 
+        btn.textContent.toLowerCase().includes('try') || 
+        btn.textContent.toLowerCase().includes('execute')
+    );
+    console.log('Relevant buttons:', relevantButtons.length);
+    relevantButtons.forEach((btn, index) => {
+        console.log(`Button ${index}:`, {
+            text: btn.textContent.trim(),
+            className: btn.className,
+            visible: btn.offsetParent !== null,
+            disabled: btn.disabled
+        });
+    });
+    
+    // Check if Swagger UI global is available
+    console.log('SwaggerUIBundle available:', typeof SwaggerUIBundle !== 'undefined');
+    console.log('SwaggerUIStandalonePreset available:', typeof SwaggerUIStandalonePreset !== 'undefined');
+    
+    // Show debug info in alert
+    alert(`Debug Info:\nTry buttons: ${tryButtons.length}\nExecute buttons: ${executeButtons.length}\nOperation blocks: ${opBlocks.length}\nCheck console for details.`);
+}
     

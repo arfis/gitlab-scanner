@@ -1411,3 +1411,30 @@ func (s *ProjectService) GetArchitectureFile(filename string) ([]byte, string, e
 
 	return content, contentType, nil
 }
+
+// GetProjectOpenAPI retrieves OpenAPI specification for a specific project
+func (s *ProjectService) GetProjectOpenAPI(projectID int) (*domain.OpenAPI, error) {
+	if s.mongoRepo == nil {
+		return nil, fmt.Errorf("MongoDB repository not available")
+	}
+
+	return s.mongoRepo.GetProjectOpenAPI(projectID)
+}
+
+// GetProjectsWithOpenAPI retrieves all projects that have OpenAPI specifications
+func (s *ProjectService) GetProjectsWithOpenAPI() ([]domain.Project, error) {
+	if s.mongoRepo == nil {
+		return nil, fmt.Errorf("MongoDB repository not available")
+	}
+
+	return s.mongoRepo.GetProjectsWithOpenAPI()
+}
+
+// GetCachedProjects retrieves cached projects by search hash
+func (s *ProjectService) GetCachedProjects(searchHash string) ([]domain.Project, error) {
+	if s.mongoRepo == nil {
+		return nil, fmt.Errorf("MongoDB repository not available")
+	}
+
+	return s.mongoRepo.GetCachedProjects(searchHash)
+}

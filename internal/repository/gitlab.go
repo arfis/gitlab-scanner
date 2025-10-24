@@ -116,6 +116,19 @@ func (r *GitLabRepository) GetProjectDetails(projectID int, ref string) (*domain
 		project.Libraries = libraries
 	}
 
+	// Get OpenAPI specification
+	openAPI, err := r.getOpenAPI(projectID, ref)
+	if err != nil {
+		// Log the error but don't fail the entire operation
+		fmt.Printf("Warning: Failed to get OpenAPI for project %d (%s): %v\n", projectID, project.Name, err)
+		project.OpenAPI = &domain.OpenAPI{Found: false}
+	} else {
+		project.OpenAPI = openAPI
+		if openAPI.Found {
+			fmt.Printf("Found OpenAPI for project %d (%s): %s\n", projectID, project.Name, openAPI.Path)
+		}
+	}
+
 	return &project, nil
 }
 
@@ -167,6 +180,76 @@ func (r *GitLabRepository) getDependencies(projectID int, ref string) ([]domain.
 
 	// Parse go.mod to extract dependencies
 	return r.parseDependencies(body), nil
+}
+
+// getOpenAPI retrieves OpenAPI specification from common file locations
+func (r *GitLabRepository) getOpenAPI(projectID int, ref string) (*domain.OpenAPI, error) {
+	// Common OpenAPI file locations to check
+	openAPIPaths := []string{
+		"openapi.yaml",
+		"openapi.yml",
+		"swagger.yaml",
+		"swagger.yml",
+		"api.yaml",
+		"api.yml",
+		"docs/openapi.yaml",
+		"docs/openapi.yml",
+		"docs/swagger.yaml",
+		"docs/swagger.yml",
+		"api/openapi.yaml",
+		"api/openapi.yml",
+	}
+
+	fmt.Printf("Searching for OpenAPI files in project %d...\n", projectID)
+	for _, filePath := range openAPIPaths {
+		openAPI, err := r.getOpenAPIFile(projectID, ref, filePath)
+		if err == nil && openAPI.Found {
+			fmt.Printf("Found OpenAPI file: %s\n", filePath)
+			return openAPI, nil
+		}
+		if err != nil {
+			fmt.Printf("Error checking %s: %v\n", filePath, err)
+		}
+	}
+
+	fmt.Printf("No OpenAPI files found for project %d\n", projectID)
+	// Return empty OpenAPI if no file found
+	return &domain.OpenAPI{
+		Content: "",
+		Path:    "",
+		Found:   false,
+	}, nil
+}
+
+// getOpenAPIFile retrieves a specific OpenAPI file
+func (r *GitLabRepository) getOpenAPIFile(projectID int, ref, filePath string) (*domain.OpenAPI, error) {
+	escaped := url.PathEscape(filePath)
+	requestURL := fmt.Sprintf("%s/projects/%d/repository/files/%s/raw", gitlabAPI, projectID, escaped)
+
+	if strings.TrimSpace(ref) != "" {
+		requestURL += "?ref=" + url.QueryEscape(ref)
+	}
+
+	fmt.Printf("Trying to fetch OpenAPI file: %s (URL: %s)\n", filePath, requestURL)
+	resp, err := r.makeRequest(requestURL)
+	if err != nil {
+		fmt.Printf("Failed to fetch %s: %v\n", filePath, err)
+		return &domain.OpenAPI{Found: false}, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Printf("Failed to read body for %s: %v\n", filePath, err)
+		return &domain.OpenAPI{Found: false}, err
+	}
+
+	fmt.Printf("Successfully fetched %s (%d bytes)\n", filePath, len(body))
+	return &domain.OpenAPI{
+		Content: string(body),
+		Path:    filePath,
+		Found:   true,
+	}, nil
 }
 
 // makeRequest makes an authenticated request to GitLab API

@@ -14,6 +14,7 @@ type Project struct {
 	UpdatedAt   time.Time `json:"updated_at,omitempty"`
 	GoVersion   string    `json:"go_version,omitempty"`
 	Libraries   []Library `json:"libraries,omitempty"`
+	OpenAPI     *OpenAPI  `json:"openapi,omitempty"`
 }
 
 // Library represents a Go module dependency
@@ -21,6 +22,13 @@ type Library struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
 	Path    string `json:"path,omitempty"`
+}
+
+// OpenAPI represents OpenAPI specification data
+type OpenAPI struct {
+	Content string `json:"content"` // Raw YAML content
+	Path    string `json:"path"`    // File path in repository
+	Found   bool   `json:"found"`   // Whether OpenAPI file was found
 }
 
 // SearchCriteria represents search parameters for projects

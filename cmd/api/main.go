@@ -63,8 +63,18 @@ func main() {
 
 	// API routes
 	mux.HandleFunc("/api/projects/search", projectHandler.SearchProjects)
+	mux.HandleFunc("/api/projects/search-openapi", projectHandler.SearchProjectsForOpenAPI)
 	mux.HandleFunc("/api/projects/changed", projectHandler.GetChangedProjects)
-	mux.HandleFunc("/api/projects/", projectHandler.GetProject)
+	mux.HandleFunc("/api/projects/openapi", projectHandler.GetProjectsWithOpenAPI)
+	mux.HandleFunc("/api/projects/", func(w http.ResponseWriter, r *http.Request) {
+		// Handle both /api/projects/{id} and /api/projects/{id}/openapi
+		path := r.URL.Path
+		if strings.HasSuffix(path, "/openapi") {
+			projectHandler.GetProjectOpenAPI(w, r)
+		} else {
+			projectHandler.GetProject(w, r)
+		}
+	})
 	mux.HandleFunc("/api/libraries", projectHandler.GetLibraries)
 
 	// Architecture routes
@@ -103,6 +113,7 @@ func main() {
 
 	// Test routes
 	mux.HandleFunc("/api/test/cache", projectHandler.TestCache)
+	mux.HandleFunc("/api/debug/openapi", projectHandler.DebugOpenAPI)
 
 	log.Println("Cache routes registered: /api/cache/load, /api/cache/refresh, /api/cache/clear, /api/cache/stats, /api/cache/refresh-project")
 	log.Println("Search routes registered: /api/search/libraries, /api/search/go-versions, /api/search/library-versions, /api/search/modules")

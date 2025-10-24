@@ -596,3 +596,459 @@ small {
 .cache-status.warning {
     color: #f39c12;
 }
+
+/* OpenAPI Documentation Styles */
+.openapi-projects {
+    margin-top: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.openapi-viewer {
+    margin-top: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.project-item {
+    transition: all 0.2s ease;
+}
+
+.project-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.openapi-content pre {
+    max-height: 500px;
+    overflow-y: auto;
+    background: #ffffff;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 15px;
+}
+
+.openapi-content button {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.openapi-content button:hover {
+    background: #0056b3;
+}
+
+.openapi-content button:active {
+    transform: translateY(1px);
+}
+
+/* OpenAPI Single Column Layout */
+.openapi-viewer {
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    background: white;
+    margin-top: 20px;
+    padding: 20px;
+}
+
+.openapi-placeholder {
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    background: #f8f9fa;
+    margin-top: 20px;
+    padding: 40px;
+    text-align: center;
+}
+
+.openapi-viewer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 0;
+    border-bottom: 1px solid #e9ecef;
+    background: #f8f9fa;
+    margin: -20px -20px 20px -20px;
+    padding: 15px 20px;
+    border-radius: 8px 8px 0 0;
+}
+
+.openapi-viewer-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* cURL Parser Styles */
+.curl-section {
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    background: #f8f9fa;
+    padding: 15px;
+    margin-top: 20px;
+}
+
+.curl-section h4 {
+    margin: 0 0 10px 0;
+    color: #2c3e50;
+    font-size: 16px;
+}
+
+.curl-section p {
+    margin: 0 0 10px 0;
+    color: #6c757d;
+    font-size: 14px;
+}
+
+#curl-input {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    resize: vertical;
+    min-height: 60px;
+}
+
+#curl-result {
+    margin-top: 10px;
+    padding: 10px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.curl-result-item {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    background: white;
+    transition: background-color 0.2s;
+}
+
+.curl-result-item:hover {
+    background-color: #f8f9fa;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+}
+
+.openapi-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background: #f8f9fa;
+}
+
+.placeholder-content {
+    text-align: center;
+    color: #6c757d;
+}
+
+.placeholder-content h3 {
+    margin: 0 0 10px 0;
+    color: #495057;
+}
+
+.placeholder-content p {
+    margin: 0;
+    font-size: 14px;
+}
+
+/* Swagger UI Customization */
+.swagger-ui {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.swagger-ui .topbar {
+    display: none;
+}
+
+.swagger-ui .info {
+    margin: 20px 0;
+}
+
+/* Ensure try it out buttons are visible */
+.swagger-ui .try-out__btn {
+    background: #49cc90 !important;
+    color: white !important;
+    border: none !important;
+    padding: 8px 16px !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    margin: 10px 0 !important;
+}
+
+.swagger-ui .try-out__btn:hover {
+    background: #3cb371 !important;
+}
+
+.swagger-ui .try-out__btn:disabled {
+    background: #ccc !important;
+    cursor: not-allowed !important;
+}
+
+/* Style the execute button */
+.swagger-ui .btn.execute {
+    background: #4990e2 !important;
+    color: white !important;
+    border: none !important;
+    padding: 8px 16px !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+}
+
+.swagger-ui .btn.execute:hover {
+    background: #357abd !important;
+}
+
+/* Ensure operation sections are properly styled */
+.swagger-ui .opblock {
+    border: 1px solid #e0e0e0 !important;
+    border-radius: 4px !important;
+    margin: 10px 0 !important;
+}
+
+.swagger-ui .opblock.opblock-get {
+    border-left: 4px solid #61affe !important;
+}
+
+.swagger-ui .opblock.opblock-post {
+    border-left: 4px solid #49cc90 !important;
+}
+
+.swagger-ui .opblock.opblock-put {
+    border-left: 4px solid #fca130 !important;
+}
+
+.swagger-ui .opblock.opblock-delete {
+    border-left: 4px solid #f93e3e !important;
+}
+
+/* Style parameter inputs */
+.swagger-ui .parameters input {
+    border: 1px solid #ddd !important;
+    border-radius: 4px !important;
+    padding: 8px !important;
+    font-size: 14px !important;
+}
+
+.swagger-ui .parameters textarea {
+    border: 1px solid #ddd !important;
+    border-radius: 4px !important;
+    padding: 8px !important;
+    font-size: 14px !important;
+    font-family: monospace !important;
+}
+
+/* Project List in Left Panel */
+.openapi-left-panel .project-item {
+    margin-bottom: 10px;
+    padding: 15px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.openapi-left-panel .project-item:hover {
+    border-color: #007bff;
+    box-shadow: 0 2px 8px rgba(0,123,255,0.15);
+}
+
+.openapi-left-panel .project-item.active {
+    border-color: #007bff;
+    background: #e7f3ff;
+}
+
+.openapi-left-panel .project-item h4 {
+    margin: 0 0 5px 0;
+    color: #2c3e50;
+    font-size: 16px;
+}
+
+.openapi-left-panel .project-item p {
+    margin: 0;
+    color: #6c757d;
+    font-size: 12px;
+}
+
+.openapi-left-panel .project-item .openapi-info {
+    margin-top: 8px;
+    padding: 5px 8px;
+    background: #d4edda;
+    border-radius: 4px;
+    font-size: 11px;
+    color: #155724;
+}
+
+.openapi-left-panel .project-item .openapi-info.no-openapi {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* OpenAPI Search Controls */
+.openapi-search-header {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.openapi-search-controls {
+    margin-top: 10px;
+}
+
+.openapi-search-controls input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    margin-bottom: 10px;
+    transition: border-color 0.2s;
+}
+
+.openapi-search-controls input:focus {
+    border-color: #007bff;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.openapi-search-controls input.searching {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='12' y1='2' x2='12' y2='6'%3E%3C/line%3E%3Cline x1='12' y1='18' x2='12' y2='22'%3E%3C/line%3E%3Cline x1='4.93' y1='4.93' x2='7.76' y2='7.76'%3E%3C/line%3E%3Cline x1='16.24' y1='16.24' x2='19.07' y2='19.07'%3E%3C/line%3E%3Cline x1='2' y1='12' x2='6' y2='12'%3E%3C/line%3E%3Cline x1='18' y1='12' x2='22' y2='12'%3E%3C/line%3E%3Cline x1='4.93' y1='19.07' x2='7.76' y2='16.24'%3E%3C/line%3E%3Cline x1='16.24' y1='7.76' x2='19.07' y2='4.93'%3E%3C/line%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 16px 16px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Search Dropdown Styles */
+.search-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+}
+
+.search-dropdown-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.search-dropdown-item:hover {
+    background-color: #f8f9fa;
+}
+
+.search-dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.search-dropdown-item h5 {
+    margin: 0 0 4px 0;
+    color: #2c3e50;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.search-dropdown-item p {
+    margin: 0;
+    color: #6c757d;
+    font-size: 12px;
+}
+
+.search-dropdown-item .openapi-badge {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 500;
+}
+
+.search-dropdown-item .openapi-badge.has-openapi {
+    background: #d4edda;
+    color: #155724;
+}
+
+.search-dropdown-item .openapi-badge.no-openapi {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.search-dropdown-item .project-path {
+    color: #6c757d;
+    font-size: 11px;
+    margin-top: 2px;
+}
+
+.openapi-search-controls select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    background: white;
+}
+
+.search-results {
+    text-align: center;
+    padding: 20px;
+    color: #6c757d;
+}
+
+.search-results .search-info {
+    margin: 0;
+    font-style: italic;
+}
+
+/* Project item search highlighting */
+.project-item.highlighted {
+    background: #fff3cd !important;
+    border-color: #ffc107 !important;
+}
+
+.project-item.search-match {
+    background: #d1ecf1 !important;
+    border-color: #17a2b8 !important;
+}
